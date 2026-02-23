@@ -175,24 +175,21 @@
 
                     // Recommended Solution - priority: Lead > PFAS High > Hardness > Default
                     const hardness = (result.typical_hardness || '').toLowerCase();
-                    const LEAD_TEST_KIT_URL = 'https://amzn.to/3OGUhB8';
-                    let recTitle, recSubtext, recUrl = '#';
+                    let recTitle, recSubtext;
+                    let recUrl = (result.recommendation_url || '').trim() || '#';
                     if (homeBuilt === 'pre-1970') {
                         recTitle = 'Recommended: Home Lead Water Test Kit';
                         recSubtext = 'Essential for older plumbing.';
-                        recUrl = LEAD_TEST_KIT_URL; // Override: always use Lead Test Kit link for Pre-1970
+                        recUrl = 'https://amzn.to/3OGUhB8'; // Override: force Lead Test Kit for Pre-1970
                     } else if (pfasLower === 'high') {
                         recTitle = 'Recommended: Reverse Osmosis (RO) Water Filter';
                         recSubtext = 'Best for removing Forever Chemicals.';
-                        recUrl = (result.recommendation_url || '').trim() || '#';
                     } else if (hardness === 'hard' || hardness === 'very hard') {
                         recTitle = 'Recommended: Under-sink Water Softener';
                         recSubtext = 'Protects appliances from limescale.';
-                        recUrl = (result.recommendation_url || '').trim() || '#';
                     } else {
                         recTitle = 'Recommended: Carbon Filter Jug';
                         recSubtext = 'Improves general taste and removes chlorine.';
-                        recUrl = (result.recommendation_url || '').trim() || '#';
                     }
                     if (recUrl !== '#' && !recUrl.startsWith('http://') && !recUrl.startsWith('https://')) {
                         recUrl = 'https://' + recUrl;

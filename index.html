@@ -4,382 +4,210 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UK Water Supplier Lookup</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        
-        .container {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            max-width: 600px;
-            width: 100%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-        
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        
-        .search-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        input {
-            flex: 1;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-            text-transform: uppercase;
-        }
-        
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        button {
-            padding: 15px 30px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        
-        button:hover {
-            background: #5568d3;
-        }
-        
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        
-        .results {
-            display: none;
-            margin-top: 30px;
-        }
-        
-        .results.show {
-            display: block;
-        }
-        
-        .result-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 15px;
-        }
-        
-        .result-card h3 {
-            color: #667eea;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .badge {
-            background: #667eea;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: normal;
-        }
-        
-        .info-row {
-            margin: 10px 0;
-            color: #555;
-            line-height: 1.6;
-        }
-        
-        .info-row strong {
-            color: #333;
-            display: inline-block;
-            min-width: 140px;
-        }
-        
-        .quality-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 5px;
-            font-size: 14px;
-            font-weight: 600;
-            margin-left: 10px;
-        }
-        
-        .hardness-soft {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .hardness-hard {
-            background: #fff3cd;
-            color: #856404;
-        }
-        
-        .hardness-very-hard {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .fluoride-yes {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-        
-        .lead-alert {
-            background: #fff3cd;
-            border-left: 4px solid #e67700;
-            padding: 12px;
-            border-radius: 5px;
-            margin-top: 15px;
-            color: #856404;
-        }
-        
-        .lead-alert strong {
-            color: #e67700;
-        }
-        
-        .link {
-            color: #667eea;
-            text-decoration: none;
-            word-break: break-all;
-        }
-        
-        .link:hover {
-            text-decoration: underline;
-        }
-        
-        .error {
-            background: #fee;
-            border: 2px solid #fcc;
-            color: #c33;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 20px;
-        }
-        
-        .loading {
-            text-align: center;
-            color: #667eea;
-            margin-top: 20px;
-            font-weight: 600;
-        }
-        
-        .example {
-            font-size: 12px;
-            color: #999;
-            margin-top: 5px;
-        }
+        body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; }
+        .card { background: white; padding: 2.5rem; border-radius: 1.5rem; box-shadow: 0 15px 35px rgba(0,0,0,0.2); width: 100%; max-width: 400px; text-align: center; }
+        input { width: 100%; padding: 0.9rem; border: 2px solid #eee; border-radius: 0.75rem; margin-bottom: 1.25rem; font-size: 1rem; box-sizing: border-box; }
+        button { width: 100%; background: #667eea; color: white; border: none; padding: 1rem; border-radius: 0.75rem; cursor: pointer; font-weight: bold; font-size: 1rem; }
+        #results-area { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #eee; display: none; text-align: left; }
+        .supplier-name { font-size: 1.3rem; font-weight: 800; color: #2d3748; margin-bottom: 0.5rem; }
+        .website-link { color: #667eea; text-decoration: none; font-weight: 600; }
+        select { width: 100%; padding: 0.9rem; border: 2px solid #eee; border-radius: 0.75rem; margin-bottom: 1.25rem; font-size: 1rem; box-sizing: border-box; background: white; cursor: pointer; }
+        .sewage-badge { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 0.75rem 1rem; border-radius: 0.75rem; font-weight: 700; font-size: 1rem; margin: 1rem 0; text-align: center; box-shadow: 0 4px 14px rgba(220,38,38,0.4); }
+        .quality-scorecard { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 0.75rem 1rem; border-radius: 0.75rem; font-weight: 700; font-size: 0.85rem; margin: 1rem 0; box-shadow: 0 4px 14px rgba(14,165,233,0.4); }
+        .quality-scorecard .scorecard-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; margin-bottom: 0.5rem; }
+        .quality-scorecard .scorecard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.5rem; text-align: center; }
+        .quality-scorecard .scorecard-item { background: rgba(255,255,255,0.2); border-radius: 0.5rem; padding: 0.5rem; }
+        .quality-scorecard .scorecard-item.pfas-warning { background: rgba(251,146,60,0.5); border: 1px solid rgba(234,88,12,0.6); }
+        .quality-scorecard .scorecard-value { font-size: 1rem; display: block; }
+        .quality-scorecard .scorecard-label { font-size: 0.65rem; opacity: 0.9; text-transform: uppercase; }
+        .lead-alert { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 1rem 1.25rem; border-radius: 0.75rem; font-weight: 700; margin: 1rem 0; display: none; box-shadow: 0 4px 14px rgba(245,158,11,0.5); border: 2px solid #b45309; }
+        .lead-alert .lead-title { font-size: 1rem; margin-bottom: 0.4rem; }
+        .lead-alert .lead-text { font-size: 0.9rem; opacity: 0.95; line-height: 1.4; }
+        .solution-box { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 2px solid #e2e8f0; border-radius: 0.75rem; padding: 1rem 1.25rem; margin: 1rem 0; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.06); transition: box-shadow 0.2s, border-color 0.2s; cursor: pointer; text-decoration: none; color: inherit; text-align: left; }
+        .solution-box:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.1); border-color: #667eea; }
+        .solution-box .solution-title { font-size: 1rem; font-weight: 700; color: #1e293b; margin: 0 0 0.25rem 0; }
+        .solution-box .solution-subtext { font-size: 0.85rem; color: #64748b; margin: 0 0 0.75rem 0; line-height: 1.3; }
+        .solution-box .solution-cta { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem; font-weight: 600; color: #667eea; }
+        .solution-box .solution-cta::after { content: '→'; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>💧 UK Water Supplier Lookup</h1>
-        <p class="subtitle">Find your water and sewerage providers by postcode</p>
+
+    <div class="card">
+        <h2>💧 Water Lookup</h2>
+        <p>Enter your postcode to find your supplier</p>
         
-        <div class="search-box">
-            <div style="flex: 1;">
-                <input 
-                    type="text" 
-                    id="postcodeInput" 
-                    placeholder="Enter postcode (e.g., SW1A 1AA)"
-                    maxlength="10">
-                <p class="example">Try: SW1A0AA, M5 0AA, or BN113BY</p>
+        <input type="text" id="postcode-input" placeholder="Enter your UK Postcode or Eircode">
+        <label for="home-built" style="display:block; text-align:left; font-size:0.9rem; margin-bottom:0.4rem; color:#555;">When was your home built?</label>
+        <select id="home-built">
+            <option value="">Select...</option>
+            <option value="pre-1970">Pre-1970</option>
+            <option value="post-1970">Post-1970</option>
+        </select>
+        <button id="search-btn" onclick="lookupPostcode()">Search</button>
+
+        <div id="results-area">
+            <div style="font-size: 0.8rem; color: #aaa; text-transform: uppercase;">Water Supplier</div>
+            <div class="supplier-name" id="display-name"></div>
+            <div class="quality-scorecard" id="quality-scorecard" style="display:none;">
+                <div class="scorecard-title">Water Quality Scorecard</div>
+                <div class="scorecard-grid">
+                    <div class="scorecard-item"><span class="scorecard-value" id="score-nitrates">—</span><span class="scorecard-label">Nitrates (mg/L)</span></div>
+                    <div class="scorecard-item"><span class="scorecard-value" id="score-chlorine">—</span><span class="scorecard-label">Chlorine (mg/L)</span></div>
+                    <div class="scorecard-item"><span class="scorecard-value" id="score-fluoride">—</span><span class="scorecard-label">Fluoride Added</span></div>
+                    <div class="scorecard-item" id="score-pfas-item"><span class="scorecard-value" id="score-pfas">—</span><span class="scorecard-label">PFAS Risk</span></div>
+                </div>
             </div>
-            <button onclick="lookupPostcode()">Search</button>
+            <a href="#" class="solution-box" id="solution-box" target="_blank" style="display:none;">
+                <div class="solution-title" id="solution-title">Recommended: Carbon Filter Jug</div>
+                <div class="solution-subtext" id="solution-subtext">Improves general taste and removes chlorine.</div>
+                <span class="solution-cta" id="solution-cta">Compare options</span>
+            </a>
+            <a href="#" class="website-link" id="display-link" target="_blank">Visit Official Site</a>
+            <div class="sewage-badge" id="sewage-badge" style="display:none;"></div>
+            <div class="lead-alert" id="lead-alert">
+                <div class="lead-title">⚠️ Lead Pipe Warning</div>
+                <div class="lead-text">Homes built before 1970 often have lead pipes or lead solder in plumbing. Lead can leach into drinking water and pose health risks, especially for children. Consider having your water tested and replacing lead pipes.</div>
+            </div>
         </div>
-        
-        <div id="loading" class="loading" style="display: none;">
-            Searching...
-        </div>
-        
-        <div id="error" class="error" style="display: none;"></div>
-        
-        <div id="results" class="results"></div>
     </div>
 
     <script>
         const SUPABASE_URL = 'https://olgqzkkubqylfhswwzmf.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZ3F6a2t1YnF5bGZoc3d3em1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxMjA3NTIsImV4cCI6MjA4MDY5Njc1Mn0.apqyKmh97veDquQDVxQg5IuFUDeNLwBlgml6s7kYyxs';
+        // Using your specific Publishable Key from your dashboard
+        const SUPABASE_KEY = 'sb_publishable_Id1_pEk0QEpJI1KSOt0Y0A_eDz-LY3P'; 
+
+        // INITIALIZATION: The fix for the 401 error is clearing the Authorization header
+        const _supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            global: {
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': '' 
+                }
+            }
+        });
 
         async function lookupPostcode() {
-            const input = document.getElementById('postcodeInput');
-            const loading = document.getElementById('loading');
-            const error = document.getElementById('error');
-            const results = document.getElementById('results');
-            
-            let postcode = input.value.trim().toUpperCase().replace(/\s+/g, '');
-            
-            if (!postcode) {
-                showError('Please enter a postcode');
-                return;
-            }
-            
-            loading.style.display = 'block';
-            error.style.display = 'none';
-            results.classList.remove('show');
-            
+            const input = document.getElementById('postcode-input');
+            const postcode = input.value.trim().toUpperCase();
+            const resultsArea = document.getElementById('results-area');
+            const nameDisplay = document.getElementById('display-name');
+            const linkDisplay = document.getElementById('display-link');
+            const sewageBadge = document.getElementById('sewage-badge');
+            const leadAlert = document.getElementById('lead-alert');
+            const solutionBox = document.getElementById('solution-box');
+            const solutionTitle = document.getElementById('solution-title');
+            const solutionSubtext = document.getElementById('solution-subtext');
+            const homeBuilt = document.getElementById('home-built').value;
+
+            if (!postcode) return alert("Please enter a postcode or Eircode");
+
+            // Accept UK postcodes (e.g. BN11 3BY) and full or partial Eircodes (e.g. D01, T12, D01 X2Y3)
+            const searchValue = postcode.replace(/\s+/g, ' ').trim();
+
+            console.log("Searching database for:", searchValue);
+
             try {
-                const response = await fetch(
-                    `${SUPABASE_URL}/rest/v1/rpc/lookup_water_supplier`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'apikey': SUPABASE_KEY,
-                            'Authorization': `Bearer ${SUPABASE_KEY}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ input_postcode: postcode })
+                const { data, error } = await _supabaseClient.rpc('lookup_water_supplier', { 
+                    input_postcode: searchValue 
+                });
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    console.log("Found result:", data);
+                    const result = data[0];
+                    nameDisplay.innerText = result.supplier_name || 'Unknown Supplier';
+                    
+                    // Handle website link - show and format if available
+                    if (result.website) {
+                        let websiteUrl = result.website.trim();
+                        if (!websiteUrl.startsWith('http://') && !websiteUrl.startsWith('https://')) {
+                            websiteUrl = 'https://' + websiteUrl;
+                        }
+                        linkDisplay.href = websiteUrl;
+                        linkDisplay.style.display = 'inline-block';
+                        linkDisplay.style.marginTop = '0.75rem';
+                    } else {
+                        linkDisplay.style.display = 'none';
                     }
-                );
-                
-                if (!response.ok) {
-                    throw new Error('Search failed');
-                }
-                
-                const data = await response.json();
-                
-                if (!data || data.length === 0) {
-                    showError(`No supplier found for postcode: ${postcode}. Try different spacing.`);
+
+                    // Water Quality Scorecard (from environmental_metrics)
+                    const scorecard = document.getElementById('quality-scorecard');
+                    const nitratesEl = document.getElementById('score-nitrates');
+                    const chlorineEl = document.getElementById('score-chlorine');
+                    const fluorideEl = document.getElementById('score-fluoride');
+                    const pfasEl = document.getElementById('score-pfas');
+                    const pfasItem = document.getElementById('score-pfas-item');
+                    nitratesEl.textContent = result.avg_nitrates != null ? Number(result.avg_nitrates).toFixed(2) : '—';
+                    chlorineEl.textContent = result.avg_chlorine != null ? Number(result.avg_chlorine).toFixed(2) : '—';
+                    if (result.fluoride_added != null) {
+                        fluorideEl.textContent = typeof result.fluoride_added === 'boolean' ? (result.fluoride_added ? 'Yes' : 'No') : String(result.fluoride_added);
+                    } else {
+                        fluorideEl.textContent = '—';
+                    }
+                    const pfasRisk = result.pfas_risk ? String(result.pfas_risk).trim() : '';
+                    pfasEl.textContent = pfasRisk || '—';
+                    const pfasLower = pfasRisk.toLowerCase();
+                    if (pfasLower === 'high' || pfasLower === 'medium') {
+                        pfasItem.classList.add('pfas-warning');
+                    } else {
+                        pfasItem.classList.remove('pfas-warning');
+                    }
+                    scorecard.style.display = 'block';
+
+                    // Sewage Spill Badge
+                    if (result.sewage_spills_2024 != null) {
+                        const count = Number(result.sewage_spills_2024).toLocaleString();
+                        sewageBadge.textContent = `🚨 ${count} Sewage Spills in 2024`;
+                        sewageBadge.style.display = 'block';
+                    } else {
+                        sewageBadge.style.display = 'none';
+                    }
+
+                    // Lead Pipe Warning - show when user selects Pre-1970
+                    leadAlert.style.display = homeBuilt === 'pre-1970' ? 'block' : 'none';
+
+                    // Recommended Solution - priority: Lead > PFAS High > Hardness > Default
+                    const hardness = (result.typical_hardness || '').toLowerCase();
+                    let recTitle, recSubtext, recUrl = '#';
+                    if (homeBuilt === 'pre-1970') {
+                        recTitle = 'Recommended: Home Lead Water Test Kit';
+                        recSubtext = 'Essential for older plumbing.';
+                        recUrl = '#';
+                    } else if (pfasLower === 'high') {
+                        recTitle = 'Recommended: Reverse Osmosis (RO) Water Filter';
+                        recSubtext = 'Best for removing Forever Chemicals.';
+                        recUrl = '#';
+                    } else if (hardness === 'hard' || hardness === 'very hard') {
+                        recTitle = 'Recommended: Under-sink Water Softener';
+                        recSubtext = 'Protects appliances from limescale.';
+                        const affUrl = (result.affiliate_filter_url || '').trim();
+                        if (affUrl) {
+                            recUrl = affUrl.startsWith('http://') || affUrl.startsWith('https://') ? affUrl : 'https://' + affUrl;
+                        }
+                    } else {
+                        recTitle = 'Recommended: Carbon Filter Jug';
+                        recSubtext = 'Improves general taste and removes chlorine.';
+                        recUrl = '#';
+                    }
+                    solutionTitle.textContent = recTitle;
+                    solutionSubtext.textContent = recSubtext;
+                    solutionBox.href = recUrl;
+                    solutionBox.style.display = 'block';
+                    
+                    resultsArea.style.display = 'block';
                 } else {
-                    displayResults(postcode, data);
+                    alert("Postcode not found. Try 'BN11 3BY' or 'LS1 1UR'.");
+                    resultsArea.style.display = 'none';
                 }
-                
             } catch (err) {
-                showError('Error searching. Please try again.');
-                console.error(err);
-            } finally {
-                loading.style.display = 'none';
+                console.error("Database Error:", err.message);
+                alert("Connection failed. Check your browser console for details.");
             }
         }
-        
-        function displayResults(postcode, data) {
-            const results = document.getElementById('results');
-            const uniqueSuppliers = new Map();
-            
-            data.forEach(d => {
-                if (!uniqueSuppliers.has(d.supplier_name)) {
-                    uniqueSuppliers.set(d.supplier_name, d);
-                }
-            });
-            
-            let html = `<h2 style="margin-bottom: 20px; color: #333;">Results for: ${postcode}</h2>`;
-            
-            uniqueSuppliers.forEach(supplier => {
-                const isWater = supplier.boundary_type.toLowerCase().includes('water');
-                const isSewerage = supplier.boundary_type.toLowerCase().includes('sewerage');
-                
-                let title = '';
-                if (isWater && isSewerage) title = '💧 Water & Sewerage';
-                else if (isWater) title = '💧 Water Supplier';
-                else if (isSewerage) title = '🚰 Sewerage Provider';
-                
-                html += createResultCard(title, supplier);
-            });
-            
-            results.innerHTML = html;
-            results.classList.add('show');
-        }
-        
-        function createResultCard(title, supplier) {
-            const isNAV = supplier.boundary_type.toLowerCase().includes('nav');
-            
-            let hardnessClass = '';
-            if (supplier.typical_hardness) {
-                if (supplier.typical_hardness.toLowerCase().includes('soft')) hardnessClass = 'hardness-soft';
-                else if (supplier.typical_hardness.toLowerCase().includes('very hard')) hardnessClass = 'hardness-very-hard';
-                else if (supplier.typical_hardness.toLowerCase().includes('hard')) hardnessClass = 'hardness-hard';
-            }
-            
-            return `
-                <div class="result-card">
-                    <h3>
-                        ${title}
-                        ${isNAV ? '<span class="badge">NAV</span>' : ''}
-                    </h3>
-                    
-                    <div class="info-row">
-                        <strong>Company:</strong> ${supplier.supplier_name}
-                    </div>
-                    
-                    ${supplier.typical_hardness ? `
-                    <div class="info-row">
-                        <strong>Water Hardness:</strong> 
-                        <span class="quality-badge ${hardnessClass}">${supplier.typical_hardness}</span>
-                        ${supplier.typical_hardness.toLowerCase().includes('soft') ? ' <span style="color: #28a745;">✓ No descaler needed</span>' : ''}
-                    </div>
-                    ` : ''}
-                    
-                    ${supplier.is_fluoridated !== null && supplier.is_fluoridated !== undefined ? `
-                    <div class="info-row">
-                        <strong>Fluoridated:</strong> 
-                        ${supplier.is_fluoridated ? '<span class="quality-badge fluoride-yes">Yes</span>' : 'No'}
-                    </div>
-                    ` : ''}
-                    
-                    ${supplier.lead_warning ? `
-                    <div class="lead-alert">
-                        <strong>⚠️ Lead Pipe Alert:</strong> If your property was built before 1970, you may have lead service pipes. Consider testing your water.
-                    </div>
-                    ` : ''}
-                    
-                    ${supplier.website ? `
-                    <div class="info-row" style="margin-top: 15px;">
-                        <strong>Website:</strong> 
-                        <a href="${supplier.website}" target="_blank" class="link">${supplier.website}</a>
-                    </div>
-                    ` : ''}
-                    
-                    ${supplier.data_url ? `
-                    <div class="info-row">
-                        <strong>Full Report:</strong> 
-                        <a href="${supplier.data_url}" target="_blank" class="link">View Detailed Quality Report →</a>
-                    </div>
-                    ` : ''}
-                </div>
-            `;
-        }
-        
-        function showError(message) {
-            const error = document.getElementById('error');
-            error.textContent = message;
-            error.style.display = 'block';
-        }
-        
-        document.getElementById('postcodeInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') lookupPostcode();
-        });
     </script>
 </body>
 </html>

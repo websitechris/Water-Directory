@@ -104,8 +104,11 @@
 
             if (!postcode) return alert("Please enter a postcode or Eircode");
 
-            // Accept UK postcodes (e.g. BN11 3BY) and full or partial Eircodes (e.g. D01, T12, D01 X2Y3)
-            const searchValue = postcode.replace(/\s+/g, ' ').trim();
+            // Eircode format: exactly 3 chars (e.g. D01, T12) — send full string as-is to preserve digits
+            // UK postcodes: normalize spaces
+            const searchValue = postcode.length === 3
+                ? postcode
+                : postcode.replace(/\s+/g, ' ').trim();
 
             console.log("Searching database for:", searchValue);
 
@@ -172,30 +175,32 @@
 
                     // Recommended Solution - priority: Lead > PFAS High > Hardness > Default
                     const hardness = (result.typical_hardness || '').toLowerCase();
+                    const LEAD_TEST_KIT_URL = 'https://amzn.to/3OGUhB8';
                     let recTitle, recSubtext, recUrl = '#';
                     if (homeBuilt === 'pre-1970') {
                         recTitle = 'Recommended: Home Lead Water Test Kit';
                         recSubtext = 'Essential for older plumbing.';
-                        recUrl = '#';
+                        recUrl = LEAD_TEST_KIT_URL; // Override: always use Lead Test Kit link for Pre-1970
                     } else if (pfasLower === 'high') {
                         recTitle = 'Recommended: Reverse Osmosis (RO) Water Filter';
                         recSubtext = 'Best for removing Forever Chemicals.';
-                        recUrl = '#';
+                        recUrl = (result.recommendation_url || '').trim() || '#';
                     } else if (hardness === 'hard' || hardness === 'very hard') {
                         recTitle = 'Recommended: Under-sink Water Softener';
                         recSubtext = 'Protects appliances from limescale.';
-                        const affUrl = (result.affiliate_filter_url || '').trim();
-                        if (affUrl) {
-                            recUrl = affUrl.startsWith('http://') || affUrl.startsWith('https://') ? affUrl : 'https://' + affUrl;
-                        }
+                        recUrl = (result.recommendation_url || '').trim() || '#';
                     } else {
                         recTitle = 'Recommended: Carbon Filter Jug';
                         recSubtext = 'Improves general taste and removes chlorine.';
-                        recUrl = '#';
+                        recUrl = (result.recommendation_url || '').trim() || '#';
+                    }
+                    if (recUrl !== '#' && !recUrl.startsWith('http://') && !recUrl.startsWith('https://')) {
+                        recUrl = 'https://' + recUrl;
                     }
                     solutionTitle.textContent = recTitle;
                     solutionSubtext.textContent = recSubtext;
                     solutionBox.href = recUrl;
+                    solutionBox.setAttribute('target', '_blank');
                     solutionBox.style.display = 'block';
                     
                     resultsArea.style.display = 'block';

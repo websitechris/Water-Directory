@@ -47,6 +47,14 @@
         .modal .btn-primary { background: #667eea; color: white; border: none; }
         .modal .btn-secondary { background: #f1f5f9; color: #475569; border: none; }
         .modal .success-msg { display: none; color: #16a34a; font-weight: 600; margin-top: 1rem; }
+        .modal-success-state { display: none; text-align: center; padding: 0.5rem 0; }
+        .modal-success-state .success-check { width: 64px; height: 64px; margin: 0 auto 1.25rem; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: white; box-shadow: 0 8px 24px rgba(34,197,94,0.4); }
+        .modal-success-state .success-check::after { content: '✓'; font-weight: bold; }
+        .modal-success-state h3 { color: #16a34a; margin-bottom: 0.75rem; font-size: 1.5rem; }
+        .modal-success-state p { color: #64748b; line-height: 1.5; margin: 0 0 1.5rem 0; font-size: 0.95rem; }
+        .modal-success-state .btn-close { padding: 0.65rem 1.5rem; background: #22c55e; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; font-size: 0.95rem; }
+        .modal-success-state .btn-close:hover { background: #16a34a; }
+        .btn-survey-requested { background: #22c55e !important; color: white !important; cursor: not-allowed !important; opacity: 0.95; }
     </style>
 </head>
 <body>
@@ -99,26 +107,33 @@
 
     <div class="modal-overlay" id="lead-modal">
         <div class="modal">
-            <h3>Request Professional Water Survey</h3>
-            <form id="lead-form">
-                <label for="lead-name">Name</label>
-                <input type="text" id="lead-name" name="name" required placeholder="Your name">
-                <label for="lead-email">Email</label>
-                <input type="email" id="lead-email" name="email" required placeholder="you@example.com">
-                <label for="lead-postcode">Postcode</label>
-                <input type="text" id="lead-postcode" name="postcode" placeholder="e.g. BN11 3BY">
-                <label for="lead-property-age">Property Age</label>
-                <select id="lead-property-age" name="property_age">
-                    <option value="">Select...</option>
-                    <option value="pre-1970">Pre-1970</option>
-                    <option value="post-1970">Post-1970</option>
-                </select>
-                <div class="modal-actions">
-                    <button type="button" class="btn-secondary" id="modal-cancel">Cancel</button>
-                    <button type="submit" class="btn-primary">Submit</button>
-                </div>
-                <div class="success-msg" id="lead-success">Thank you! We'll be in touch shortly.</div>
-            </form>
+            <div id="modal-form-content">
+                <h3>Request Professional Water Survey</h3>
+                <form id="lead-form">
+                    <label for="lead-name">Name</label>
+                    <input type="text" id="lead-name" name="name" required placeholder="Your name">
+                    <label for="lead-email">Email</label>
+                    <input type="email" id="lead-email" name="email" required placeholder="you@example.com">
+                    <label for="lead-postcode">Postcode</label>
+                    <input type="text" id="lead-postcode" name="postcode" placeholder="e.g. BN11 3BY">
+                    <label for="lead-property-age">Property Age</label>
+                    <select id="lead-property-age" name="property_age">
+                        <option value="">Select...</option>
+                        <option value="pre-1970">Pre-1970</option>
+                        <option value="post-1970">Post-1970</option>
+                    </select>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" id="modal-cancel">Cancel</button>
+                        <button type="submit" class="btn-primary" id="lead-submit-btn">Submit</button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-success-state" id="modal-success-content">
+                <div class="success-check"></div>
+                <h3>Thank You!</h3>
+                <p>Your request has been securely received. One of our local water quality experts will review your property details and contact you shortly.</p>
+                <button type="button" class="btn-close" id="modal-success-close">Close</button>
+            </div>
         </div>
     </div>
 
@@ -166,11 +181,24 @@
 
         const leadModal = document.getElementById('lead-modal');
         const leadForm = document.getElementById('lead-form');
-        const leadSuccess = document.getElementById('lead-success');
+        const modalFormContent = document.getElementById('modal-form-content');
+        const modalSuccessContent = document.getElementById('modal-success-content');
+        const leadSubmitBtn = document.getElementById('lead-submit-btn');
+        const btnSurvey = document.getElementById('btn-survey');
+
+        function showFormState() {
+            modalFormContent.style.display = 'block';
+            modalSuccessContent.style.display = 'none';
+        }
+
+        function showSuccessState() {
+            modalFormContent.style.display = 'none';
+            modalSuccessContent.style.display = 'block';
+        }
 
         document.getElementById('btn-survey').addEventListener('click', () => {
             leadModal.classList.add('open');
-            leadSuccess.style.display = 'none';
+            showFormState();
             leadForm.reset();
             document.getElementById('lead-postcode').value = document.getElementById('postcode-input').value.trim() || '';
             document.getElementById('lead-property-age').value = document.getElementById('home-built').value || '';
@@ -180,12 +208,18 @@
             leadModal.classList.remove('open');
         });
 
+        document.getElementById('modal-success-close').addEventListener('click', () => {
+            leadModal.classList.remove('open');
+        });
+
         leadModal.addEventListener('click', (e) => {
             if (e.target === leadModal) leadModal.classList.remove('open');
         });
 
         leadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            leadSubmitBtn.textContent = 'Sending...';
+            leadSubmitBtn.disabled = true;
             const payload = {
                 name: document.getElementById('lead-name').value.trim(),
                 email: document.getElementById('lead-email').value.trim(),
@@ -207,16 +241,19 @@
                     const errText = await response.text();
                     console.error('Lead insert failed:', response.status, errText);
                     alert('Something went wrong. Please try again.');
+                    leadSubmitBtn.textContent = 'Submit';
+                    leadSubmitBtn.disabled = false;
                     return;
                 }
-                leadSuccess.style.display = 'block';
-                setTimeout(() => {
-                    leadModal.classList.remove('open');
-                    leadSuccess.style.display = 'none';
-                }, 2000);
+                showSuccessState();
+                btnSurvey.textContent = 'Survey Requested ✓';
+                btnSurvey.classList.add('btn-survey-requested');
+                btnSurvey.disabled = true;
             } catch (err) {
                 console.error('Lead insert error:', err);
                 alert('Something went wrong. Please try again.');
+                leadSubmitBtn.textContent = 'Submit';
+                leadSubmitBtn.disabled = false;
             }
         });
 

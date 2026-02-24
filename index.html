@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UK Water Supplier Lookup</title>
+    <meta name="description" id="meta-description" content="Search your UK postcode or Eircode to find your water supplier and view local water quality data.">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; }
@@ -55,13 +56,20 @@
         .modal-success-state .btn-close { padding: 0.65rem 1.5rem; background: #22c55e; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; font-size: 0.95rem; }
         .modal-success-state .btn-close:hover { background: #16a34a; }
         .btn-survey-requested { background: #22c55e !important; color: white !important; cursor: not-allowed !important; opacity: 0.95; }
+        .cta-block { border-radius: 0.75rem; padding: 1rem 1.25rem; margin: 1rem 0; display: none; }
+        .cta-block.lead { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; box-shadow: 0 4px 14px rgba(245,158,11,0.4); border: 2px solid #b45309; }
+        .cta-block.hardness { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; box-shadow: 0 4px 14px rgba(14,165,233,0.4); }
+        .cta-block .cta-heading { font-size: 1rem; font-weight: 700; margin: 0 0 0.5rem 0; }
+        .cta-block .cta-btn { display: inline-block; background: white; color: #667eea; padding: 0.6rem 1.2rem; border-radius: 0.5rem; font-weight: 700; border: none; cursor: pointer; font-size: 0.9rem; margin-top: 0.5rem; }
+        .cta-block .cta-link { display: block; margin-top: 0.6rem; font-size: 0.85rem; opacity: 0.95; }
+        .cta-block .cta-link a { color: white; text-decoration: underline; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>💧 Water Lookup</h2>
-        <p>Enter your postcode to find your supplier</p>
+        <h2 id="main-heading">💧 Water Lookup</h2>
+        <p id="main-subheading">Enter your postcode to find your supplier</p>
         
         <input type="text" id="postcode-input" placeholder="Enter your UK Postcode or Eircode">
         <label for="home-built" style="display:block; text-align:left; font-size:0.9rem; margin-bottom:0.4rem; color:#555;">When was your home built?</label>
@@ -73,6 +81,7 @@
         <button id="search-btn" onclick="lookupPostcode()">Search</button>
 
         <div id="results-area">
+            <h1 id="report-h1" style="display:none; font-size:1.4rem; font-weight:800; color:#1e293b; margin:0 0 0.5rem 0;"></h1>
             <div style="font-size: 0.8rem; color: #aaa; text-transform: uppercase;">Water Supplier</div>
             <div class="supplier-name" id="display-name"></div>
             <div class="quality-scorecard" id="quality-scorecard" style="display:none;">
@@ -88,14 +97,17 @@
                     <span class="scorecard-badge" id="badge-family-health">Family Health Score: —</span>
                 </div>
             </div>
-            <div style="display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap;">
-                <a href="#" class="solution-box" id="solution-box" target="_blank" style="display:none; flex:1; min-width:200px;">
-                    <div class="solution-title" id="solution-title">Recommended: Carbon Filter Jug</div>
-                    <div class="solution-subtext" id="solution-subtext">Improves general taste and removes chlorine.</div>
-                    <span class="solution-cta" id="solution-cta">Read the Deep-Dive</span>
-                </a>
-                <button type="button" id="btn-survey" style="display:none; padding:0.75rem 1rem; background:#475569; color:white; border:none; border-radius:0.5rem; font-weight:600; cursor:pointer; font-size:0.9rem; white-space:nowrap;">Request Professional Water Survey</button>
+            <div class="cta-block lead" id="cta-lead">
+                <div class="cta-heading">⚠️ Pre-1970 Property? Lead pipes may affect your mortgage.</div>
+                <button type="button" class="cta-btn" id="btn-lead-survey">Request Lead Survey Quote</button>
+                <div class="cta-link"><a href="/pillars/lead-pipes-mortgage-risk-uk.html" target="_blank">Read the Mortgage Risk Deep-Dive</a></div>
             </div>
+            <div class="cta-block hardness" id="cta-hardness">
+                <div class="cta-heading">Hard water in your area — save on energy & appliances.</div>
+                <button type="button" class="cta-btn" id="btn-softener">Calculate Energy Savings with a Softener</button>
+                <div class="cta-link"><a href="/pillars/hard-water-boiler-efficiency-eczema-uk.html" target="_blank">Read the Hard Water & Boiler Efficiency Deep-Dive</a></div>
+            </div>
+            <button type="button" id="btn-survey" style="display:none; padding:0.75rem 1rem; background:#475569; color:white; border:none; border-radius:0.5rem; font-weight:600; cursor:pointer; font-size:0.9rem; white-space:nowrap; margin-top:0.5rem;">Request Professional Water Survey</button>
             <a href="#" class="website-link" id="display-link" target="_blank">Visit Official Site</a>
             <div class="sewage-badge" id="sewage-badge" style="display:none;"></div>
             <div class="lead-alert" id="lead-alert">
@@ -122,6 +134,7 @@
                         <option value="pre-1970">Pre-1970</option>
                         <option value="post-1970">Post-1970</option>
                     </select>
+                    <input type="hidden" id="lead-interest-type" name="interest_type" value="">
                     <div class="modal-actions">
                         <button type="button" class="btn-secondary" id="modal-cancel">Cancel</button>
                         <button type="submit" class="btn-primary" id="lead-submit-btn">Submit</button>
@@ -154,28 +167,59 @@
 
         const SCHEMA_ID = 'water-quality-schema';
 
+        function getTownFromPostcode(postcode) {
+            const prefix = String(postcode).replace(/\s/g, '').substring(0, 2).toUpperCase();
+            const area = String(postcode).replace(/\s/g, '').substring(0, 1).toUpperCase();
+            const map = {
+                'PO': 'Portsmouth', 'M': 'Manchester', 'BN': 'Brighton', 'B': 'Birmingham',
+                'L': 'Liverpool', 'S': 'Sheffield', 'LS': 'Leeds',
+                'SW': 'London', 'SE': 'London', 'NW': 'London', 'N': 'London', 'E': 'London',
+                'W': 'London', 'EC': 'London', 'WC': 'London',
+                'BS': 'Bristol', 'OX': 'Oxford', 'CB': 'Cambridge', 'NG': 'Nottingham',
+                'AB': 'Aberdeen', 'EH': 'Edinburgh', 'G': 'Glasgow', 'D': 'Dublin'
+            };
+            return map[prefix] || map[area] || 'your area';
+        }
+
         function injectSchema(data, postcode) {
             const existing = document.getElementById(SCHEMA_ID);
             if (existing) existing.remove();
-            const props = [];
-            if (data.avg_nitrates != null) props.push({ '@type': 'PropertyValue', name: 'Nitrates (mg/L)', value: data.avg_nitrates });
-            if (data.avg_chlorine != null) props.push({ '@type': 'PropertyValue', name: 'Chlorine (mg/L)', value: data.avg_chlorine });
-            if (data.pfas_risk) props.push({ '@type': 'PropertyValue', name: 'PFAS Risk', value: data.pfas_risk });
-            if (data.typical_hardness) props.push({ '@type': 'PropertyValue', name: 'Typical Hardness', value: data.typical_hardness });
-            if (data.sewage_spills_2024 != null) props.push({ '@type': 'PropertyValue', name: 'Sewage Spills 2024', value: data.sewage_spills_2024 });
-            const schema = {
+            const hardness = data.typical_hardness || 'Unknown';
+            const nitrates = data.avg_nitrates != null ? Number(data.avg_nitrates) : null;
+            const pfas = data.pfas_risk || 'Unknown';
+            const dataset = {
                 '@context': 'https://schema.org',
-                '@type': 'LocalBusiness',
-                name: data.supplier_name || 'Water Supplier',
-                description: `Water quality data for ${postcode}`,
-                areaServed: { '@type': 'Place', name: postcode },
-                additionalProperty: props.length ? props : undefined
+                '@type': 'Dataset',
+                name: `Water Quality Data - ${postcode}`,
+                description: `Local water quality metrics for ${postcode}: Hardness ${hardness}, Nitrates ${nitrates != null ? nitrates + ' mg/L' : 'N/A'}, PFAS Risk ${pfas}.`,
+                spatialCoverage: { '@type': 'Place', name: postcode },
+                publisher: { '@type': 'Organization', name: data.supplier_name || 'Water Supplier' },
+                distribution: { '@type': 'DataDownload', encodingFormat: 'application/json' },
+                variableMeasured: [
+                    { '@type': 'PropertyValue', name: 'Water Hardness', value: hardness },
+                    { '@type': 'PropertyValue', name: 'Nitrates (mg/L)', value: nitrates },
+                    { '@type': 'PropertyValue', name: 'PFAS Risk Level', value: pfas }
+                ]
             };
-            if (!schema.additionalProperty) delete schema.additionalProperty;
+            const faqItems = [
+                { question: `What is the water hardness in ${postcode}?`, answer: `The typical water hardness in ${postcode} is ${hardness}.` },
+                { question: `What are the nitrate levels in ${postcode}?`, answer: nitrates != null ? `Nitrate levels in ${postcode} average ${nitrates} mg/L.` : `Nitrate data for ${postcode} is being updated.` },
+                { question: `What is the PFAS risk in ${postcode}?`, answer: `The PFAS risk level for ${postcode} is ${pfas}.` }
+            ];
+            const faqSchema = {
+                '@context': 'https://schema.org',
+                '@type': 'FAQPage',
+                mainEntity: faqItems.map(item => ({
+                    '@type': 'Question',
+                    name: item.question,
+                    acceptedAnswer: { '@type': 'Answer', text: item.answer }
+                }))
+            };
+            const wrapper = { '@graph': [dataset, faqSchema] };
             const script = document.createElement('script');
             script.id = SCHEMA_ID;
             script.type = 'application/ld+json';
-            script.textContent = JSON.stringify(schema);
+            script.textContent = JSON.stringify(wrapper);
             document.head.appendChild(script);
         }
 
@@ -196,13 +240,18 @@
             modalSuccessContent.style.display = 'block';
         }
 
-        document.getElementById('btn-survey').addEventListener('click', () => {
+        function openLeadModal(interestType = '') {
             leadModal.classList.add('open');
             showFormState();
             leadForm.reset();
             document.getElementById('lead-postcode').value = document.getElementById('postcode-input').value.trim() || '';
             document.getElementById('lead-property-age').value = document.getElementById('home-built').value || '';
-        });
+            document.getElementById('lead-interest-type').value = interestType;
+        }
+
+        document.getElementById('btn-survey').addEventListener('click', () => openLeadModal(''));
+        document.getElementById('btn-lead-survey').addEventListener('click', () => openLeadModal('Lead Survey'));
+        document.getElementById('btn-softener').addEventListener('click', () => openLeadModal('Softener'));
 
         document.getElementById('modal-cancel').addEventListener('click', () => {
             leadModal.classList.remove('open');
@@ -224,7 +273,8 @@
                 name: document.getElementById('lead-name').value.trim(),
                 email: document.getElementById('lead-email').value.trim(),
                 postcode: document.getElementById('lead-postcode').value.trim(),
-                property_age: document.getElementById('lead-property-age').value || null
+                property_age: document.getElementById('lead-property-age').value || null,
+                interest_type: document.getElementById('lead-interest-type').value || null
             };
             try {
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
@@ -246,9 +296,8 @@
                     return;
                 }
                 showSuccessState();
-                btnSurvey.textContent = 'Survey Requested ✓';
-                btnSurvey.classList.add('btn-survey-requested');
-                btnSurvey.disabled = true;
+                const surveyBtns = [btnSurvey, document.getElementById('btn-lead-survey'), document.getElementById('btn-softener')];
+                surveyBtns.forEach(b => { if (b) { b.textContent = 'Survey Requested ✓'; b.classList.add('btn-survey-requested'); b.disabled = true; } });
             } catch (err) {
                 console.error('Lead insert error:', err);
                 alert('Something went wrong. Please try again.');
@@ -265,9 +314,6 @@
             const linkDisplay = document.getElementById('display-link');
             const sewageBadge = document.getElementById('sewage-badge');
             const leadAlert = document.getElementById('lead-alert');
-            const solutionBox = document.getElementById('solution-box');
-            const solutionTitle = document.getElementById('solution-title');
-            const solutionSubtext = document.getElementById('solution-subtext');
             const homeBuilt = document.getElementById('home-built').value;
 
             if (!postcode) return alert("Please enter a postcode or Eircode");
@@ -341,31 +387,22 @@
                     // Lead Pipe Warning - show when user selects Pre-1970
                     leadAlert.style.display = homeBuilt === 'pre-1970' ? 'block' : 'none';
 
-                    // Recommended Solution - pillar links (no affiliate)
+                    // Dynamic SEO & H1
+                    const town = getTownFromPostcode(searchValue);
+                    document.title = `Water Quality Report for ${town} (${searchValue}) | UK Water Directory`;
+                    const metaDesc = document.getElementById('meta-description');
+                    if (metaDesc) metaDesc.setAttribute('content', `Water quality report for ${town}: ${result.supplier_name || 'Water supplier'}. Hardness: ${result.typical_hardness || 'N/A'}, Nitrates: ${result.avg_nitrates != null ? result.avg_nitrates + ' mg/L' : 'N/A'}, PFAS: ${result.pfas_risk || 'N/A'}.`);
+                    const reportH1 = document.getElementById('report-h1');
+                    if (reportH1) { reportH1.textContent = `Water Quality Report for ${town}`; reportH1.style.display = 'block'; }
+                    document.getElementById('main-heading').style.display = 'none';
+                    document.getElementById('main-subheading').style.display = 'none';
+
+                    // High-Ticket CTA blocks
                     const hardness = (result.typical_hardness || '').toLowerCase();
-                    let recTitle, recSubtext, recUrl;
-                    if (homeBuilt === 'pre-1970') {
-                        recTitle = 'Recommended: Home Lead Water Test Kit';
-                        recSubtext = 'Essential for older plumbing.';
-                        recUrl = '/pillars/lead-risk';
-                    } else if (pfasLower === 'high') {
-                        recTitle = 'Recommended: Reverse Osmosis (RO) Water Filter';
-                        recSubtext = 'Best for removing Forever Chemicals.';
-                        recUrl = '/pillars/pfas-forever-chemicals';
-                    } else if (hardness === 'hard' || hardness === 'very hard') {
-                        recTitle = 'Recommended: Under-sink Water Softener';
-                        recSubtext = 'Protects appliances from limescale.';
-                        recUrl = '/pillars/hard-water-impact';
-                    } else {
-                        recTitle = 'Recommended: Carbon Filter Jug';
-                        recSubtext = 'Improves general taste and removes chlorine.';
-                        recUrl = '/pillars/water-quality';
-                    }
-                    solutionTitle.textContent = recTitle;
-                    solutionSubtext.textContent = recSubtext;
-                    solutionBox.href = recUrl;
-                    solutionBox.setAttribute('target', '_blank');
-                    solutionBox.style.display = 'block';
+                    const ctaLead = document.getElementById('cta-lead');
+                    const ctaHardness = document.getElementById('cta-hardness');
+                    ctaLead.style.display = homeBuilt === 'pre-1970' ? 'block' : 'none';
+                    ctaHardness.style.display = (homeBuilt !== 'pre-1970' && (hardness === 'hard' || hardness === 'very hard')) ? 'block' : 'none';
 
                     // Homebuyer UI badges
                     const propValBadge = document.getElementById('badge-property-value');
@@ -383,8 +420,9 @@
                     // JSON-LD schema injection
                     injectSchema(result, searchValue);
 
-                    // Show survey CTA
-                    document.getElementById('btn-survey').style.display = 'inline-block';
+                    // Show generic survey CTA (when neither lead nor hardness CTA applies)
+                    const showGenericSurvey = homeBuilt !== 'pre-1970' && hardness !== 'hard' && hardness !== 'very hard';
+                    document.getElementById('btn-survey').style.display = showGenericSurvey ? 'inline-block' : 'none';
                     document.getElementById('lead-postcode').value = searchValue;
                     document.getElementById('lead-property-age').value = homeBuilt || '';
                     
@@ -392,6 +430,12 @@
                 } else {
                     alert("Postcode not found. Try 'BN11 3BY' or 'LS1 1UR'.");
                     resultsArea.style.display = 'none';
+                    document.getElementById('main-heading').style.display = '';
+                    document.getElementById('main-subheading').style.display = '';
+                    document.getElementById('report-h1').style.display = 'none';
+                    document.title = 'UK Water Supplier Lookup';
+                    const md = document.getElementById('meta-description');
+                    if (md) md.setAttribute('content', 'Search your UK postcode or Eircode to find your water supplier and view local water quality data.');
                 }
             } catch (err) {
                 console.error("Database Error:", err.message);

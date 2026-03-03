@@ -18,7 +18,7 @@
         .sewage-badge { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 0.75rem 1rem; border-radius: 0.75rem; font-weight: 700; font-size: 1rem; margin: 1rem 0; text-align: center; box-shadow: 0 4px 14px rgba(220,38,38,0.4); }
         .quality-scorecard { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 0.75rem 1rem; border-radius: 0.75rem; font-weight: 700; font-size: 0.85rem; margin: 1rem 0; box-shadow: 0 4px 14px rgba(14,165,233,0.4); }
         .quality-scorecard .scorecard-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; margin-bottom: 0.5rem; }
-        .quality-scorecard .scorecard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.5rem; text-align: center; }
+        .quality-scorecard .scorecard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 0.5rem; text-align: center; }
         .quality-scorecard .scorecard-item { background: rgba(255,255,255,0.2); border-radius: 0.5rem; padding: 0.5rem; }
         .quality-scorecard .scorecard-item.pfas-warning { background: rgba(251,146,60,0.5); border: 1px solid rgba(234,88,12,0.6); }
         .quality-scorecard .scorecard-value { font-size: 1rem; display: block; }
@@ -63,6 +63,11 @@
         .cta-block .cta-btn { display: inline-block; background: white; color: #667eea; padding: 0.6rem 1.2rem; border-radius: 0.5rem; font-weight: 700; border: none; cursor: pointer; font-size: 0.9rem; margin-top: 0.5rem; }
         .cta-block .cta-link { display: block; margin-top: 0.6rem; font-size: 0.85rem; opacity: 0.95; }
         .cta-block .cta-link a { color: white; text-decoration: underline; }
+        .pollution-alert { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 1rem 1.25rem; border-radius: 0.75rem; margin: 1rem 0; box-shadow: 0 4px 14px rgba(220,38,38,0.4); }
+        .pollution-alert .pollution-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; }
+        .pollution-alert .pollution-site { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.35rem; }
+        .pollution-alert .pollution-stats { font-size: 0.85rem; opacity: 0.95; }
+        .pollution-alert .pollution-source { font-size: 0.65rem; opacity: 0.85; margin-top: 0.5rem; }
     </style>
 </head>
 <body>
@@ -91,11 +96,20 @@
                     <div class="scorecard-item"><span class="scorecard-value" id="score-chlorine">—</span><span class="scorecard-label">Chlorine (mg/L)</span></div>
                     <div class="scorecard-item"><span class="scorecard-value" id="score-fluoride">—</span><span class="scorecard-label">Fluoride Added</span></div>
                     <div class="scorecard-item" id="score-pfas-item"><span class="scorecard-value" id="score-pfas">—</span><span class="scorecard-label">PFAS Risk</span></div>
+                    <div class="scorecard-item"><span class="scorecard-value" id="score-lead">—</span><span class="scorecard-label">Lead (µg/L)</span></div>
                 </div>
                 <div class="scorecard-badges">
                     <span class="scorecard-badge" id="badge-property-value">Property Value Impact: —</span>
                     <span class="scorecard-badge" id="badge-family-health">Family Health Score: —</span>
                 </div>
+                <div class="scorecard-transparency" id="scorecard-transparency" style="display:none; font-size:0.7rem; opacity:0.9; margin-top:0.5rem; font-style:italic;">Awaiting Local Lab Results - Regional averages apply.</div>
+                <div class="scorecard-source" style="font-size:0.65rem; opacity:0.8; margin-top:0.75rem;">Source: Southern Water 2024 Lab Results</div>
+            </div>
+            <div class="pollution-alert" id="pollution-alert" style="display:none;">
+                <div class="pollution-title">Local Pollution Alert</div>
+                <div class="pollution-site" id="pollution-site">—</div>
+                <div class="pollution-stats"><span id="pollution-spills">0</span> spills · <span id="pollution-duration">0</span> hrs total</div>
+                <div class="pollution-source">Source: Rivers Trust 2024 EDM</div>
             </div>
             <div class="cta-block lead" id="cta-lead">
                 <div class="cta-heading">⚠️ Pre-1970 Property? Lead pipes may affect your mortgage.</div>
@@ -108,8 +122,7 @@
                 <div class="cta-link"><a href="/pillars/hard-water-boiler-efficiency-eczema-uk.html" target="_blank">Read the Hard Water & Boiler Efficiency Deep-Dive</a></div>
             </div>
             <button type="button" id="btn-survey" style="display:none; padding:0.75rem 1rem; background:#475569; color:white; border:none; border-radius:0.5rem; font-weight:600; cursor:pointer; font-size:0.9rem; white-space:nowrap; margin-top:0.5rem;">Request Professional Water Survey</button>
-            <a href="#" class="website-link" id="display-link" target="_blank">Visit Official Site</a>
-            <div class="sewage-badge" id="sewage-badge" style="display:none;"></div>
+            <a href="#" class="website-link" id="display-link" target="_blank" style="display:none;">Visit Official Site</a>
             <div class="lead-alert" id="lead-alert">
                 <div class="lead-title">⚠️ Lead Pipe Warning</div>
                 <div class="lead-text">Homes built before 1970 often have lead pipes or lead solder in plumbing. Lead can leach into drinking water and pose health risks, especially for children. Consider having your water tested and replacing lead pipes.</div>
@@ -152,18 +165,8 @@
 
     <script>
         const SUPABASE_URL = 'https://olgqzkkubqylfhswwzmf.supabase.co';
-        // Using your specific Publishable Key from your dashboard
-        const SUPABASE_KEY = 'sb_publishable_Id1_pEk0QEpJI1KSOt0Y0A_eDz-LY3P'; 
-
-        // INITIALIZATION: The fix for the 401 error is clearing the Authorization header
-        const _supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-            global: {
-                headers: {
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': '' 
-                }
-            }
-        });
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZ3F6a2t1YnF5bGZoc3d3em1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxMjA3NTIsImV4cCI6MjA4MDY5Njc1Mn0.apqyKmh97veDquQDVxQg5IuFUDeNLwBlgml6s7kYyxs';
+        const _supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         const SCHEMA_ID = 'water-quality-schema';
 
@@ -186,6 +189,7 @@
             if (existing) existing.remove();
             const hardness = data.typical_hardness || 'Unknown';
             const nitrates = data.avg_nitrates != null ? Number(data.avg_nitrates) : null;
+            const lead = data.avg_lead != null ? Number(data.avg_lead) : null;
             const pfas = data.pfas_risk || 'Unknown';
             const dataset = {
                 '@context': 'https://schema.org',
@@ -198,12 +202,14 @@
                 variableMeasured: [
                     { '@type': 'PropertyValue', name: 'Water Hardness', value: hardness },
                     { '@type': 'PropertyValue', name: 'Nitrates (mg/L)', value: nitrates },
+                    { '@type': 'PropertyValue', name: 'Lead (µg/L)', value: lead },
                     { '@type': 'PropertyValue', name: 'PFAS Risk Level', value: pfas }
                 ]
             };
             const faqItems = [
                 { question: `What is the water hardness in ${postcode}?`, answer: `The typical water hardness in ${postcode} is ${hardness}.` },
                 { question: `What are the nitrate levels in ${postcode}?`, answer: nitrates != null ? `Nitrate levels in ${postcode} average ${nitrates} mg/L.` : `Nitrate data for ${postcode} is being updated.` },
+                { question: `What are the lead levels in ${postcode}?`, answer: lead != null ? `Lead levels in ${postcode} average ${lead} µg/L.` : `Lead data for ${postcode} is being updated.` },
                 { question: `What is the PFAS risk in ${postcode}?`, answer: `The PFAS risk level for ${postcode} is ${pfas}.` }
             ];
             const faqSchema = {
@@ -306,140 +312,180 @@
             }
         });
 
+        function formatPostcodeForLookup(raw) {
+            const s = String(raw).trim().toUpperCase().replace(/\s+/g, '');
+            if (s.length <= 4) return s;
+            return s.slice(0, -3) + ' ' + s.slice(-3);
+        }
+
+        function formatPostcodeForApi(raw) {
+            const s = String(raw).trim().toUpperCase().replace(/\s+/g, '');
+            if (s.length <= 4) return s;
+            return s.slice(0, -3) + ' ' + s.slice(-3);
+        }
+
+        function haversineKm(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
         async function lookupPostcode() {
             const input = document.getElementById('postcode-input');
-            const postcode = input.value.trim().toUpperCase();
+            const raw = input.value.trim();
             const resultsArea = document.getElementById('results-area');
             const nameDisplay = document.getElementById('display-name');
-            const linkDisplay = document.getElementById('display-link');
-            const sewageBadge = document.getElementById('sewage-badge');
             const leadAlert = document.getElementById('lead-alert');
             const homeBuilt = document.getElementById('home-built').value;
 
-            if (!postcode) return alert("Please enter a postcode or Eircode");
+            if (!raw) return alert("Please enter a postcode or Eircode");
 
-            // Eircode format: exactly 3 chars (e.g. D01, T12) — send full string as-is to preserve digits
-            // UK postcodes: normalize spaces
-            const searchValue = postcode.length === 3
-                ? postcode
-                : postcode.replace(/\s+/g, ' ').trim();
+            const searchBtn = document.getElementById('search-btn');
+            searchBtn.textContent = 'Searching...';
+            searchBtn.disabled = true;
 
-            console.log("Searching database for:", searchValue);
+            const searchValue = raw.length === 3 ? raw : raw.replace(/\s+/g, ' ').trim().toUpperCase();
+            const lookupPcd = raw.length === 3 ? raw : raw.replace(/\s+/g, '').toUpperCase();
+            const apiPcd = formatPostcodeForApi(raw);
+
+            console.log("Searching:", searchValue);
 
             try {
-                const { data, error } = await _supabaseClient.rpc('lookup_water_supplier', { 
-                    input_postcode: searchValue 
-                });
+                // 1. Bridge Lookup: postcode_lsoa_lookup -> lsoa21cd
+                const { data: lsoaData } = await _supabaseClient.rpc('lookup_lsoa_from_postcode', { input_postcode: lookupPcd });
+                const lsoa21cd = lsoaData?.[0]?.lsoa_code || null;
 
-                if (error) throw error;
+                // 2. Chemical Averages (Tap Water): raw_chemical_samples for NITRATE, LEAD, CHLORINE
+                let avgNitrates = null, avgLead = null, avgChlorine = null, avgFluoride = null, hasLocalSamples = false;
 
-                if (data && data.length > 0) {
-                    console.log("Found result:", data);
-                    const result = data[0];
-                    nameDisplay.innerText = result.supplier_name || 'Unknown Supplier';
-                    
-                    // Handle website link - show and format if available
-                    if (result.website) {
-                        let websiteUrl = result.website.trim();
-                        if (!websiteUrl.startsWith('http://') && !websiteUrl.startsWith('https://')) {
-                            websiteUrl = 'https://' + websiteUrl;
-                        }
-                        linkDisplay.href = websiteUrl;
-                        linkDisplay.style.display = 'inline-block';
-                        linkDisplay.style.marginTop = '0.75rem';
-                    } else {
-                        linkDisplay.style.display = 'none';
-                    }
-
-                    // Water Quality Scorecard (from environmental_metrics)
-                    const scorecard = document.getElementById('quality-scorecard');
-                    const nitratesEl = document.getElementById('score-nitrates');
-                    const chlorineEl = document.getElementById('score-chlorine');
-                    const fluorideEl = document.getElementById('score-fluoride');
-                    const pfasEl = document.getElementById('score-pfas');
-                    const pfasItem = document.getElementById('score-pfas-item');
-                    nitratesEl.textContent = result.avg_nitrates != null ? Number(result.avg_nitrates).toFixed(2) : '—';
-                    chlorineEl.textContent = result.avg_chlorine != null ? Number(result.avg_chlorine).toFixed(2) : '—';
-                    if (result.fluoride_added != null) {
-                        fluorideEl.textContent = typeof result.fluoride_added === 'boolean' ? (result.fluoride_added ? 'Yes' : 'No') : String(result.fluoride_added);
-                    } else {
-                        fluorideEl.textContent = '—';
-                    }
-                    const pfasRisk = result.pfas_risk ? String(result.pfas_risk).trim() : '';
-                    pfasEl.textContent = pfasRisk || '—';
-                    const pfasLower = pfasRisk.toLowerCase();
-                    if (pfasLower === 'high' || pfasLower === 'medium') {
-                        pfasItem.classList.add('pfas-warning');
-                    } else {
-                        pfasItem.classList.remove('pfas-warning');
-                    }
-                    scorecard.style.display = 'block';
-
-                    // Sewage Spill Badge
-                    if (result.sewage_spills_2024 != null) {
-                        const count = Number(result.sewage_spills_2024).toLocaleString();
-                        sewageBadge.textContent = `🚨 ${count} Sewage Spills in 2024`;
-                        sewageBadge.style.display = 'block';
-                    } else {
-                        sewageBadge.style.display = 'none';
-                    }
-
-                    // Lead Pipe Warning - show when user selects Pre-1970
-                    leadAlert.style.display = homeBuilt === 'pre-1970' ? 'block' : 'none';
-
-                    // Dynamic SEO & H1
-                    const town = getTownFromPostcode(searchValue);
-                    document.title = `Water Quality Report for ${town} (${searchValue}) | UK Water Directory`;
-                    const metaDesc = document.getElementById('meta-description');
-                    if (metaDesc) metaDesc.setAttribute('content', `Water quality report for ${town}: ${result.supplier_name || 'Water supplier'}. Hardness: ${result.typical_hardness || 'N/A'}, Nitrates: ${result.avg_nitrates != null ? result.avg_nitrates + ' mg/L' : 'N/A'}, PFAS: ${result.pfas_risk || 'N/A'}.`);
-                    const reportH1 = document.getElementById('report-h1');
-                    if (reportH1) { reportH1.textContent = `Water Quality Report for ${town}`; reportH1.style.display = 'block'; }
-                    document.getElementById('main-heading').style.display = 'none';
-                    document.getElementById('main-subheading').style.display = 'none';
-
-                    // High-Ticket CTA blocks
-                    const hardness = (result.typical_hardness || '').toLowerCase();
-                    const ctaLead = document.getElementById('cta-lead');
-                    const ctaHardness = document.getElementById('cta-hardness');
-                    ctaLead.style.display = homeBuilt === 'pre-1970' ? 'block' : 'none';
-                    ctaHardness.style.display = (homeBuilt !== 'pre-1970' && (hardness === 'hard' || hardness === 'very hard')) ? 'block' : 'none';
-
-                    // Homebuyer UI badges
-                    const propValBadge = document.getElementById('badge-property-value');
-                    const familyBadge = document.getElementById('badge-family-health');
-                    const hasLeadRisk = homeBuilt === 'pre-1970';
-                    const hasExtremeHardness = hardness === 'very hard';
-                    const propValHigh = hasLeadRisk || hasExtremeHardness;
-                    propValBadge.textContent = 'Property Value Impact: ' + (propValHigh ? 'High' : 'Low/Neutral');
-                    propValBadge.className = 'scorecard-badge ' + (propValHigh ? 'high' : 'neutral');
-                    const nitrates = result.avg_nitrates != null ? Number(result.avg_nitrates) : 0;
-                    const familyWarning = pfasLower === 'high' || nitrates > 25;
-                    familyBadge.textContent = 'Family Health Score: ' + (familyWarning ? 'Review' : 'Good');
-                    familyBadge.className = 'scorecard-badge ' + (familyWarning ? 'warning' : 'neutral');
-
-                    // JSON-LD schema injection
-                    injectSchema(result, searchValue);
-
-                    // Show generic survey CTA (when neither lead nor hardness CTA applies)
-                    const showGenericSurvey = homeBuilt !== 'pre-1970' && hardness !== 'hard' && hardness !== 'very hard';
-                    document.getElementById('btn-survey').style.display = showGenericSurvey ? 'inline-block' : 'none';
-                    document.getElementById('lead-postcode').value = searchValue;
-                    document.getElementById('lead-property-age').value = homeBuilt || '';
-                    
-                    resultsArea.style.display = 'block';
-                } else {
-                    alert("Postcode not found. Try 'BN11 3BY' or 'LS1 1UR'.");
-                    resultsArea.style.display = 'none';
-                    document.getElementById('main-heading').style.display = '';
-                    document.getElementById('main-subheading').style.display = '';
-                    document.getElementById('report-h1').style.display = 'none';
-                    document.title = 'UK Water Supplier Lookup';
-                    const md = document.getElementById('meta-description');
-                    if (md) md.setAttribute('content', 'Search your UK postcode or Eircode to find your water supplier and view local water quality data.');
+                function parseChemResponse(arr, fillOnlyNull = false) {
+                    if (!Array.isArray(arr)) return;
+                    arr.forEach(row => {
+                        const d = String(row?.determinand ?? '').trim().toUpperCase();
+                        const val = row?.avg_result;
+                        if (val == null && val !== 0) return;  // skip null/undefined, keep 0
+                        if (d === 'NITRATE' || d === 'NITRATES') { if (!fillOnlyNull || avgNitrates == null) avgNitrates = val; }
+                        else if (d === 'LEAD') { if (!fillOnlyNull || avgLead == null) avgLead = val; }
+                        else if (d === 'CHLORINE' || d === 'CHLORIDE') { if (!fillOnlyNull || avgChlorine == null) avgChlorine = val; }
+                        else if (d === 'FLUORIDE') { if (!fillOnlyNull || avgFluoride == null) avgFluoride = val; }
+                    });
                 }
+
+                if (lsoa21cd) {
+                    const { data: chemData } = await _supabaseClient.rpc('get_chemical_averages_for_lsoa', { p_lsoa_code: lsoa21cd, p_water_company: null });
+                    if (chemData?.length) {
+                        hasLocalSamples = true;
+                        parseChemResponse(chemData);
+                    }
+                }
+                if (!hasLocalSamples || avgNitrates == null && avgLead == null) {
+                    const { data: regionalData } = await _supabaseClient.rpc('get_regional_chemical_averages', { p_water_company: 'Southern Water' });
+                    if (regionalData?.length) {
+                        parseChemResponse(regionalData, true);
+                        if (!hasLocalSamples) { /* keep false for fallback message */ }
+                    }
+                }
+
+                nameDisplay.innerText = hasLocalSamples ? 'Southern Water' : 'Your Area';
+
+                // 3. GPS: postcodes.io
+                let lat = null, lng = null;
+                try {
+                    const geoRes = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(apiPcd)}`);
+                    const geoJson = await geoRes.json();
+                    if (geoJson?.result) {
+                        lat = geoJson.result.latitude;
+                        lng = geoJson.result.longitude;
+                    }
+                } catch (e) { console.warn('Postcodes.io failed:', e); }
+
+                // 4. Nearest Sewage Spill: Haversine in JS
+                let nearestSpill = null;
+                if (lat != null && lng != null) {
+                    const { data: spillsData } = await _supabaseClient.rpc('get_sewage_spills_near', { p_lat: lat, p_lng: lng, p_radius_km: 80 });
+                    if (spillsData?.length) {
+                        let minDist = Infinity;
+                        spillsData.forEach(s => {
+                            const d = haversineKm(lat, lng, s.latitude, s.longitude);
+                            if (d < minDist) { minDist = d; nearestSpill = s; }
+                        });
+                    }
+                }
+
+                // 5 & 6. Update UI - format to 2 decimals, update dials
+                function fmt(val) {
+                    if (val == null || (typeof val === 'number' && isNaN(val))) return '—';
+                    return Number(val).toFixed(2);
+                }
+                const scorecard = document.getElementById('quality-scorecard');
+                const nitratesEl = document.getElementById('score-nitrates');
+                const leadEl = document.getElementById('score-lead');
+                const chlorineEl = document.getElementById('score-chlorine');
+                if (nitratesEl) nitratesEl.textContent = fmt(avgNitrates);
+                if (leadEl) leadEl.textContent = fmt(avgLead);
+                if (chlorineEl) chlorineEl.textContent = fmt(avgChlorine);
+                const fluorideEl = document.getElementById('score-fluoride');
+                if (fluorideEl) fluorideEl.textContent = fmt(avgFluoride);
+                document.getElementById('score-pfas').textContent = 'N/A';
+                document.getElementById('scorecard-transparency').style.display = !hasLocalSamples ? 'block' : 'none';
+                scorecard.style.display = 'block';
+
+                const pollutionAlert = document.getElementById('pollution-alert');
+                if (nearestSpill) {
+                    pollutionAlert.style.display = 'block';
+                    document.getElementById('pollution-site').textContent = nearestSpill.site_name || 'Nearest overflow';
+                    document.getElementById('pollution-spills').textContent = (nearestSpill.counted_spills ?? 0).toLocaleString();
+                    document.getElementById('pollution-duration').textContent = (nearestSpill.total_duration_hrs ?? 0).toFixed(1);
+                } else {
+                    pollutionAlert.style.display = 'none';
+                }
+
+                leadAlert.style.display = homeBuilt === 'pre-1970' ? 'block' : 'none';
+
+                const town = getTownFromPostcode(searchValue);
+                document.title = `Water Quality Report for ${town} (${searchValue}) | UK Water Directory`;
+                const metaDesc = document.getElementById('meta-description');
+                if (metaDesc) metaDesc.setAttribute('content', `Water quality report for ${town}. Nitrates: ${avgNitrates != null ? avgNitrates + ' mg/L' : 'N/A'}, Lead: ${avgLead != null ? avgLead + ' µg/L' : 'N/A'}.`);
+                const reportH1 = document.getElementById('report-h1');
+                if (reportH1) { reportH1.textContent = `Water Quality Report for ${town}`; reportH1.style.display = 'block'; }
+                document.getElementById('main-heading').style.display = 'none';
+                document.getElementById('main-subheading').style.display = 'none';
+
+                const ctaLead = document.getElementById('cta-lead');
+                const ctaHardness = document.getElementById('cta-hardness');
+                ctaLead.style.display = homeBuilt === 'pre-1970' ? 'block' : 'none';
+                ctaHardness.style.display = 'none';
+
+                const propValBadge = document.getElementById('badge-property-value');
+                const familyBadge = document.getElementById('badge-family-health');
+                const hasLeadRisk = homeBuilt === 'pre-1970';
+                propValBadge.textContent = 'Property Value Impact: ' + (hasLeadRisk ? 'High' : 'Low/Neutral');
+                propValBadge.className = 'scorecard-badge ' + (hasLeadRisk ? 'high' : 'neutral');
+                const nitrates = avgNitrates != null ? Number(avgNitrates) : 0;
+                const familyWarning = nitrates > 25 || (avgLead != null && avgLead > 10);
+                familyBadge.textContent = 'Family Health Score: ' + (familyWarning ? 'Review' : 'Good');
+                familyBadge.className = 'scorecard-badge ' + (familyWarning ? 'warning' : 'neutral');
+
+                injectSchema({ avg_nitrates: avgNitrates, avg_lead: avgLead, typical_hardness: null, pfas_risk: null }, searchValue);
+
+                document.getElementById('btn-survey').style.display = 'inline-block';
+                document.getElementById('lead-postcode').value = searchValue;
+                document.getElementById('lead-property-age').value = homeBuilt || '';
+                resultsArea.style.display = 'block';
             } catch (err) {
-                console.error("Database Error:", err.message);
-                alert("Connection failed. Check your browser console for details.");
+                console.error("Search error:", err);
+                alert("Search failed. Please try again.");
+                document.getElementById('main-heading').style.display = '';
+                document.getElementById('main-subheading').style.display = '';
+                document.getElementById('report-h1').style.display = 'none';
+                document.title = 'UK Water Supplier Lookup';
+                const md = document.getElementById('meta-description');
+                if (md) md.setAttribute('content', 'Search your UK postcode or Eircode to find your water supplier and view local water quality data.');
+            } finally {
+                searchBtn.textContent = 'Search';
+                searchBtn.disabled = false;
             }
         }
     </script>

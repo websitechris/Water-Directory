@@ -68,6 +68,8 @@
         .pollution-alert .pollution-site { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.35rem; }
         .pollution-alert .pollution-stats { font-size: 0.85rem; opacity: 0.95; }
         .pollution-alert .pollution-source { font-size: 0.65rem; opacity: 0.85; margin-top: 0.5rem; }
+        #search-btn.search-loading { cursor: not-allowed; animation: search-pulse 1.5s ease-in-out infinite; }
+        @keyframes search-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.75; } }
     </style>
 </head>
 <body>
@@ -343,8 +345,9 @@
             if (!raw) return alert("Please enter a postcode or Eircode");
 
             const searchBtn = document.getElementById('search-btn');
-            searchBtn.textContent = 'Searching...';
+            searchBtn.textContent = '🔍 Analyzing local lab results & sewage data (this can take 10-15s)...';
             searchBtn.disabled = true;
+            searchBtn.classList.add('search-loading');
 
             const searchValue = raw.length === 3 ? raw : raw.replace(/\s+/g, ' ').trim().toUpperCase();
             const lookupPcd = raw.length === 3 ? raw : raw.replace(/\s+/g, '').toUpperCase();
@@ -486,6 +489,7 @@
             } finally {
                 searchBtn.textContent = 'Search';
                 searchBtn.disabled = false;
+                searchBtn.classList.remove('search-loading');
             }
         }
     </script>

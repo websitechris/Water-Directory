@@ -356,19 +356,33 @@
             console.log("Searching:", searchValue);
 
             try {
-                // 1. Bridge Lookup: postcode_lsoa_lookup -> lsoa21cd
-                const { data: lsoaData } = await _supabaseClient.rpc('lookup_lsoa_from_postcode', { input_postcode: lookupPcd });
-                const lsoa21cd = lsoaData?.[0]?.lsoa_code || null;
+                // ==========================================
+                // 1. POSTCODES.IO: Get LSOA + GPS from postcode
+                // ==========================================
+                let lsoa = null, lat = null, lng = null;
+                try {
+                    const geoRes = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(apiPcd)}`);
+                    const geoJson = await geoRes.json();
+                    if (geoJson?.result) {
+                        // Use result.codes.lsoa (official code e.g. E01017968), NOT result.lsoa (human name e.g. 'Cambridge 011B')
+                        const codes = geoJson.result.codes;
+                        lsoa = (codes?.lsoa ?? codes?.lsoa21) || null;
+                        lat = geoJson.result.latitude;
+                        lng = geoJson.result.longitude;
+                        console.log("[TRACE] Postcodes.io LSOA extracted:", JSON.stringify(lsoa), "(raw codes:", JSON.stringify(codes) + ")");
+                    }
+                    if (!lsoa && geoJson?.error) console.warn("Postcodes.io error:", geoJson.error);
+                } catch (e) { console.warn('Postcodes.io failed:', e); }
 
-                // 2. Chemical Averages (Tap Water): raw_chemical_samples for NITRATE, LEAD, CHLORINE
-                let avgNitrates = null, avgLead = null, avgChlorine = null, avgFluoride = null, hasLocalSamples = false;
+                let hasLocalSamples = false;
+                let avgNitrates = null, avgLead = null, avgChlorine = null, avgFluoride = null;
 
                 function parseChemResponse(arr, fillOnlyNull = false) {
                     if (!Array.isArray(arr)) return;
                     arr.forEach(row => {
                         const d = String(row?.determinand ?? '').trim().toUpperCase();
                         const val = row?.avg_result;
-                        if (val == null && val !== 0) return;  // skip null/undefined, keep 0
+                        if (val == null && val !== 0) return;  
                         if (d === 'NITRATE' || d === 'NITRATES') { if (!fillOnlyNull || avgNitrates == null) avgNitrates = val; }
                         else if (d === 'LEAD') { if (!fillOnlyNull || avgLead == null) avgLead = val; }
                         else if (d === 'CHLORINE' || d === 'CHLORIDE') { if (!fillOnlyNull || avgChlorine == null) avgChlorine = val; }
@@ -376,35 +390,75 @@
                     });
                 }
 
-                if (lsoa21cd) {
-                    const { data: chemData } = await _supabaseClient.rpc('get_chemical_averages_for_lsoa', { p_lsoa_code: lsoa21cd, p_water_company: null });
-                    if (chemData?.length) {
+                // ==========================================
+                // 2. QUERY water_zones + chemical_readings by zone_id (LSOA)
+                // ==========================================
+                if (lsoa) {
+                    const zoneRes = await _supabaseClient.from('water_zones').select('*').eq('zone_id', lsoa).maybeSingle();
+                    const chemRes = await _supabaseClient.from('chemical_readings').select('*').eq('zone_id', lsoa);
+                    const zoneData = zoneRes.data;
+                    const chemData = chemRes.data;
+
+                    console.log("[TRACE] Supabase water_zones query (zone_id=" + JSON.stringify(lsoa) + "):", { data: zoneData, error: zoneRes.error });
+                    console.log("[TRACE] Supabase chemical_readings query (zone_id=" + JSON.stringify(lsoa) + "):", { rowCount: chemData?.length ?? 0, data: chemData, error: chemRes.error });
+
+                    if (zoneData || (chemData && chemData.length > 0)) {
                         hasLocalSamples = true;
-                        parseChemResponse(chemData);
+                        nameDisplay.innerText = zoneData ? `${zoneData.supplier} (${zoneData.zone_name})` : 'Your Area';
+
+                        if (chemData && chemData.length > 0) {
+                            chemData.forEach(row => {
+                                let displayVal = row.value_raw;
+                                if (displayVal && displayVal.includes('|')) {
+                                    displayVal = displayVal.split('|')[1].trim(); 
+                                }
+                                const chem = (row.chemical || '').toUpperCase();
+                                if (chem.includes('LEAD')) avgLead = displayVal;
+                                else if (chem.includes('NITRATE')) avgNitrates = displayVal;
+                                else if (chem.includes('CHLORINE') || chem.includes('DISINFECTANT')) avgChlorine = displayVal;
+                                else if (chem.includes('FLUORIDE')) avgFluoride = displayVal;
+                            });
+                            console.log("[TRACE] Parsed chemicals ->", { avgNitrates, avgLead, avgChlorine, avgFluoride });
+                        }
+
+                        const sourceEls = document.querySelectorAll('.scorecard-source');
+                        sourceEls.forEach(el => el.textContent = `Source: ${zoneData?.supplier || 'Water Supplier'} 2024 Lab Results`);
+                    } else {
+                        console.log("[TRACE] No zone/chem data for LSOA", lsoa, "- zoneData:", !!zoneData, "chemCount:", chemData?.length ?? 0);
                     }
                 }
-                if (!hasLocalSamples || avgNitrates == null && avgLead == null) {
-                    const { data: regionalData } = await _supabaseClient.rpc('get_regional_chemical_averages', { p_water_company: 'Southern Water' });
-                    if (regionalData?.length) {
-                        parseChemResponse(regionalData, true);
-                        if (!hasLocalSamples) { /* keep false for fallback message */ }
+
+                // ==========================================
+                // 3. FALLBACK: RPC lookup + regional when no water_zones/chemical_readings data
+                // ==========================================
+                if (!hasLocalSamples) {
+                    console.log("⚠️ No water_zones/chemical_readings for LSOA. Falling back to RPC + regional...");
+                    const { data: lsoaData } = await _supabaseClient.rpc('lookup_lsoa_from_postcode', { input_postcode: lookupPcd });
+                    const lsoa21cd = lsoaData?.[0]?.lsoa_code || lsoa;
+
+                    if (lsoa21cd) {
+                        const { data: chemData } = await _supabaseClient.rpc('get_chemical_averages_for_lsoa', { p_lsoa_code: lsoa21cd, p_water_company: null });
+                        if (chemData?.length) {
+                            hasLocalSamples = true;
+                            parseChemResponse(chemData);
+                        }
                     }
+                    if (!hasLocalSamples || (avgNitrates == null && avgLead == null)) {
+                        const { data: regionalData } = await _supabaseClient.rpc('get_regional_chemical_averages', { p_water_company: 'Southern Water' });
+                        if (regionalData?.length) {
+                            parseChemResponse(regionalData, true);
+                        }
+                    }
+
+                    nameDisplay.innerText = hasLocalSamples ? 'Southern Water' : 'Your Area';
+                    const sourceEls = document.querySelectorAll('.scorecard-source');
+                    sourceEls.forEach(el => el.textContent = `Source: Southern Water 2024 Lab Results`);
                 }
 
-                nameDisplay.innerText = hasLocalSamples ? 'Southern Water' : 'Your Area';
+                // ==========================================
+                // 4. SEWAGE SPILL LOOKUP (lat/lng from postcodes.io step 1)
+                // ==========================================
 
-                // 3. GPS: postcodes.io
-                let lat = null, lng = null;
-                try {
-                    const geoRes = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(apiPcd)}`);
-                    const geoJson = await geoRes.json();
-                    if (geoJson?.result) {
-                        lat = geoJson.result.latitude;
-                        lng = geoJson.result.longitude;
-                    }
-                } catch (e) { console.warn('Postcodes.io failed:', e); }
-
-                // 4. Nearest Sewage Spill: Haversine in JS
                 let nearestSpill = null;
                 if (lat != null && lng != null) {
                     const { data: spillsData } = await _supabaseClient.rpc('get_sewage_spills_near', { p_lat: lat, p_lng: lng, p_radius_km: 80 });
@@ -417,21 +471,22 @@
                     }
                 }
 
-                // 5 & 6. Update UI - format to 2 decimals, update dials
+                // ==========================================
+                // 5. UPDATE SCORECARD UI
+                // ==========================================
                 function fmt(val) {
+                    if (typeof val === 'string' && val.includes('<')) return val;
                     if (val == null || (typeof val === 'number' && isNaN(val))) return '—';
                     return Number(val).toFixed(2);
                 }
+
                 const scorecard = document.getElementById('quality-scorecard');
-                const nitratesEl = document.getElementById('score-nitrates');
-                const leadEl = document.getElementById('score-lead');
-                const chlorineEl = document.getElementById('score-chlorine');
-                if (nitratesEl) nitratesEl.textContent = fmt(avgNitrates);
-                if (leadEl) leadEl.textContent = fmt(avgLead);
-                if (chlorineEl) chlorineEl.textContent = fmt(avgChlorine);
-                const fluorideEl = document.getElementById('score-fluoride');
-                if (fluorideEl) fluorideEl.textContent = fmt(avgFluoride);
+                if (document.getElementById('score-nitrates')) document.getElementById('score-nitrates').textContent = fmt(avgNitrates);
+                if (document.getElementById('score-lead')) document.getElementById('score-lead').textContent = fmt(avgLead);
+                if (document.getElementById('score-chlorine')) document.getElementById('score-chlorine').textContent = fmt(avgChlorine);
+                if (document.getElementById('score-fluoride')) document.getElementById('score-fluoride').textContent = fmt(avgFluoride);
                 document.getElementById('score-pfas').textContent = 'N/A';
+                
                 document.getElementById('scorecard-transparency').style.display = !hasLocalSamples ? 'block' : 'none';
                 scorecard.style.display = 'block';
 
@@ -466,8 +521,11 @@
                 const hasLeadRisk = homeBuilt === 'pre-1970';
                 propValBadge.textContent = 'Property Value Impact: ' + (hasLeadRisk ? 'High' : 'Low/Neutral');
                 propValBadge.className = 'scorecard-badge ' + (hasLeadRisk ? 'high' : 'neutral');
-                const nitrates = avgNitrates != null ? Number(avgNitrates) : 0;
-                const familyWarning = nitrates > 25 || (avgLead != null && avgLead > 10);
+                
+                const nitratesNum = (typeof avgNitrates === 'string') ? parseFloat(avgNitrates.replace('<', '')) : (avgNitrates != null ? Number(avgNitrates) : 0);
+                const leadNum = (typeof avgLead === 'string') ? parseFloat(avgLead.replace('<', '')) : (avgLead != null ? Number(avgLead) : 0);
+                const familyWarning = nitratesNum > 25 || leadNum > 10;
+                
                 familyBadge.textContent = 'Family Health Score: ' + (familyWarning ? 'Review' : 'Good');
                 familyBadge.className = 'scorecard-badge ' + (familyWarning ? 'warning' : 'neutral');
 
@@ -477,6 +535,7 @@
                 document.getElementById('lead-postcode').value = searchValue;
                 document.getElementById('lead-property-age').value = homeBuilt || '';
                 resultsArea.style.display = 'block';
+
             } catch (err) {
                 console.error("Search error:", err);
                 alert("Search failed. Please try again.");

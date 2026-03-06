@@ -145,22 +145,23 @@ async function fetchWaterData(
       source = `${zoneData?.supplier ?? "Water Supplier"} 2024 Lab Results`;
 
       if (chemData && chemData.length > 0) {
+        // Map DB chemical names to scorecard slots (handles Anglian, Cambridge, Thames variants)
+        // DB names: Nitrate, Nitrate as NO3 | Lead as Pb, Lead | Chlorine (Residual), Chlorine (Total), CHLORINE | Fluoride as F, Fluoride
         chemData.forEach((row: { chemical?: string; value_raw?: string }) => {
           let displayVal = row.value_raw;
           if (displayVal && displayVal.includes("|")) {
             displayVal = displayVal.split("|")[1]?.trim() ?? displayVal;
           }
           const chem = (row.chemical || "").toUpperCase();
-          if (chem.includes("LEAD")) chemicals.lead = parseValue(displayVal);
-          else if (chem.includes("NITRATE"))
-            chemicals.nitrates = parseValue(displayVal);
-          else if (
-            chem.includes("CHLORINE") ||
-            chem.includes("DISINFECTANT")
-          )
-            chemicals.chlorine = parseValue(displayVal);
-          else if (chem.includes("FLUORIDE"))
-            chemicals.fluoride = parseValue(displayVal);
+          const val = parseValue(displayVal);
+          if (chem.includes("LEAD")) chemicals.lead = val;
+          else if (chem.includes("NITRATE") || chem.includes("NITRATES"))
+            chemicals.nitrates = val;
+          else if (chem.includes("CHLORINE") || chem.includes("DISINFECTANT")) {
+            // Prefer Chlorine (Total) over Chlorine (Residual) when both exist
+            if (!chemicals.chlorine || chem.includes("(TOTAL)"))
+              chemicals.chlorine = val;
+          } else if (chem.includes("FLUORIDE")) chemicals.fluoride = val;
         });
       }
     }

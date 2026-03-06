@@ -1,0 +1,88 @@
+# Water Directory Project - Cursor Rules
+
+## Stack
+- Next.js 14 App Router
+- TypeScript
+- Tailwind CSS
+- Supabase (PostgreSQL + PostGIS)
+- Vercel deployment
+- GitHub version control
+
+## Project Purpose
+UK water quality directory. User enters postcode → app returns 
+tap water chemical data (nitrates, lead, fluoride, chlorine) 
+and sewage spill info for their area.
+
+## Architecture: "God Mode" Postcode Lookup
+1. User enters postcode
+2. Strip spaces, ping postcodes.io API → returns LSOA code
+3. Query Supabase water_zones table matching zone_id = LSOA
+4. Query Supabase chemical_readings table matching zone_id
+5. Return data to WaterScorecard component
+6. Fallback to regional averages if no local data
+
+## Supabase Tables
+- suppliers: 25 UK water companies
+- postcodes: 2.7M UK postcodes with coordinates (PostGIS)
+- water_zones: LSOA boundary codes mapped to suppliers
+- chemical_readings: chemical data keyed on zone_id (UPPERCASE)
+- sewage_spills: spill records with location coords
+
+## Critical Supabase Rules
+- NEVER put Supabase service_role key in client-side code
+- anon key only in frontend, service_role in API routes only
+- All Supabase fetch logic lives in app/api/ routes, never components
+- RLS policies must allow public SELECT or frontend shows 0 results
+- Always upload water_zones BEFORE chemical_readings (foreign key)
+- Batch uploads in groups of 200-500 rows
+
+## File Structure
+- app/api/water/route.ts → postcode lookup (server-side)
+- app/api/leads/route.ts → lead form submissions
+- components/WaterScorecard.tsx → results display
+- components/WaterLookup.tsx → search form
+- app/page.tsx → main page
+
+## Environment Variables
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY
+- SUPABASE_SERVICE_ROLE_KEY (server/API routes only)
+
+## UK Legal Limits for Chemical RAG Status
+- Nitrates: 50 mg/l
+- Lead: 10 µg/l
+- Fluoride: 1.5 mg/l
+- Chlorine: 1.0 mg/l
+Green = <50% of limit, Amber = 50-80%, Red = >80%
+
+## Data Sources
+- streamwaterdata.co.uk → primary CSV source for all water companies
+- postcodes.io → free postcode to LSOA translation API
+- ONS Postcode Directory → 2.7M postcode coordinates
+- Ofwat NAV shapefiles → water supplier boundary zones
+
+## Live Data (already in Supabase)
+- Thames Water (PDF extraction → custom Zone IDs)
+- Southern Water (Stream CSV → LSOA)
+- Cambridge Water (Stream CSV → LSOA)
+
+## Still To Add
+- Anglian Water
+- Severn Trent
+- Yorkshire Water
+- United Utilities
+- Wessex Water
+- Northumbrian Water
+- South West Water
+- Welsh Water (Dŵr Cymru)
+- Scottish Water (different system - do last)
+- NI Water (different system - do last)
+
+## Code Style
+- TypeScript strict mode
+- Functional components only
+- Dynamic color logic: never show red alert for 0 spills
+- Clinical white card UI, not colorful blocks
+- Mobile-first responsive design
+- Primary CTA: "Request Lead Survey Quote" (solid blue)
+- Secondary CTA: ghost/outline button

@@ -215,7 +215,9 @@ export function WaterLookup() {
                     </div>
                     <div className="text-sm text-red-600">
                       {spill!.countedSpills.toLocaleString()} spills
-                      · {spill!.totalDurationHrs.toFixed(1)} hrs total
+                      {spill!.totalDurationHrs != null && spill!.totalDurationHrs > 0
+                        ? ` · ${spill!.totalDurationHrs.toFixed(1)} hrs total`
+                        : " recorded"}
                     </div>
                   </>
                 ) : null}

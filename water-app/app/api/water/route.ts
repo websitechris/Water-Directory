@@ -70,7 +70,7 @@ async function fetchWaterData(
         hasLocalSamples: false,
         chemicals: { nitrates: null, lead: null, chlorine: null, fluoride: null },
         nearestSpill: null,
-        source: "Southern Water 2024 Lab Results",
+        source: "Water quality data",
         error: "Server misconfiguration: missing Supabase credentials",
       },
       { status: 500 }
@@ -211,7 +211,7 @@ async function fetchWaterData(
   let hasLocalSamples = false;
   let supplier = "Your Area";
   let zoneName: string | null = null;
-  let source = "Southern Water 2024 Lab Results";
+  let source = "Regional baseline data";
   const chemicals = {
     nitrates: null as number | string | null,
     lead: null as number | string | null,
@@ -308,7 +308,7 @@ async function fetchWaterData(
     if (!hasLocalSamples || (chemicals.nitrates == null && chemicals.lead == null)) {
       const { data: regionalData } = await supabase.rpc(
         "get_regional_chemical_averages",
-        { p_water_company: "Southern Water" }
+        { p_water_company: null }
       );
       if (regionalData?.length) {
         regionalData.forEach((row: { determinand?: string; avg_result?: number }) => {
@@ -328,8 +328,8 @@ async function fetchWaterData(
         });
       }
     }
-    supplier = hasLocalSamples ? "Southern Water" : "Your Area";
-    source = "Southern Water 2024 Lab Results";
+    supplier = "Your Area";
+    source = "Regional baseline data";
   }
 
   // 4. Sewage spill lookup

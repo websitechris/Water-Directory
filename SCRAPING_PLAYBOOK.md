@@ -44,3 +44,30 @@ Advanced security (like Cloudflare Turnstile) looks for the `webdriver=true` fin
 Once you bypass the API and download the raw PDF reports, you need to turn them back into databases.
 * **The Tactic:** Use `pdfplumber` to extract tables (`page.extract_tables()`).
 * **The Execution:** Write strict logic rules (e.g., `if len(row) >= 6` and `if row[0] in exact_targets`) to skip glossary paragraphs and isolate the specific chemical rows and Mean averages.
+---
+
+# 🏗️ Phase 2: "God Mode" Architecture & Database Rules
+*(Added after the Thames Water Heist & Cambridge LSOA Bulk Upload)*
+
+## 🏛️ The "God Mode" Search Architecture
+We do NOT use complex GIS polygons (they are a math headache). We use a lightning-fast "Bridge" system to connect users to their local data:
+1. User enters a postcode (e.g., "CB1 2JW").
+2. Frontend strips spaces and pings the free API `postcodes.io`.
+3. API returns the official `LSOA` boundary code (e.g., "E01017968").
+4. Frontend queries Supabase `water_zones` and `chemical_readings` tables matching that specific `zone_id`.
+5. If data exists, it renders the local Scorecard. If not, it falls back to regional averages.
+
+## 🌊 The "Stream" Pivot & API Limits
+Before trying to hack a water board's website, check the national open-data portal:
+* **The Source:** `streamwaterdata.co.uk` is the golden repository for UK water data. 
+* **The Rule:** Always search for "Domestic Tap Water Quality" or "Compliance Data" here first to find clean CSVs.
+* **Defeating the ArcGIS 1,000-Row Limit:** When you find an ArcGIS API page, it often says `Max Record Count: 1000`. Do not download from the backend developer view. Go back to the main ArcGIS Hub page for that dataset and click "Download -> CSV". This forces a full export, giving you all 60,000+ rows.
+
+## 🗄️ Supabase "Sanity-Safe" Upload Rules
+Rules to prevent database crashes and security lockouts:
+* **Foreign Keys FIRST:** When uploading new regions, you must bulk-upload the LSOA codes to the `water_zones` table FIRST. If you upload chemicals first, the `chemical_readings` table rejects them because the `zone_id` doesn't exist yet.
+* **The Key Rule:** Use the public `anon` key for the Next.js/Vercel frontend app. Use the secret `service_role` key ONLY in local Python scripts to bypass security and bulk-insert data.
+* **RLS (Row Level Security):** Supabase locks tables by default. Even with perfect data, the website will show "0 results" until you run a SQL policy to allow public "SELECT" (read) access:
+  `create policy "Public readings are viewable by everyone." on chemical_readings for select using ( true );`
+* **Batching:** Upload data to Supabase in batches of 200-500 using Python to prevent API timeout errors.
+* **The Excel 1-Million Limit:** Never open massive files (like the 2.7M row ONS Bridge) in MS Excel. It will crash or truncate the file. Let Python handle it directly.

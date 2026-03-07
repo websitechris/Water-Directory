@@ -214,7 +214,8 @@ export function WaterLookup() {
                       {spill!.siteName}
                     </div>
                     <div className="text-sm text-red-600">
-                      {spill!.countedSpills.toLocaleString()} spills
+                      {spill!.countedSpills.toLocaleString()}{" "}
+                      {spill!.countedSpills === 1 ? "spill" : "spills"}
                       {spill!.totalDurationHrs != null && spill!.totalDurationHrs > 0
                         ? ` · ${spill!.totalDurationHrs.toFixed(1)} hrs total`
                         : " recorded"}
@@ -247,7 +248,7 @@ export function WaterLookup() {
               type="button"
               onClick={() => setLeadModalOpen(true)}
               disabled={leadSubmitted}
-              className="rounded-lg bg-slate-600 px-4 py-2 font-semibold text-white hover:bg-slate-700 disabled:bg-green-600 disabled:cursor-not-allowed"
+              className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:bg-green-600 disabled:cursor-not-allowed"
             >
               {leadSubmitted ? "Survey Requested ✓" : "Request Professional Water Survey"}
             </button>

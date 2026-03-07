@@ -34,12 +34,13 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
     familyHealthScore,
   } = data;
 
+  const displaySupplier = supplier.replace(/\(.*$/, "").trim();
   const displayName = zoneName
-    ? `${supplier} (${zoneName})`
-    : supplier;
+    ? `${displaySupplier} (${zoneName})`
+    : displaySupplier;
 
   const sourceText = hasLocalSamples
-    ? `Source: ${supplier} official lab results 2024`
+    ? `Source: ${displaySupplier} official lab results 2024`
     : "Regional baseline data shown — local lab results for your exact supply zone are updated annually by your water company";
 
   return (

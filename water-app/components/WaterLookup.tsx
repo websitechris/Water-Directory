@@ -5,37 +5,6 @@ import { WaterScorecard } from "./WaterScorecard";
 import type { WaterScorecardData } from "./WaterScorecard";
 import type { WaterApiResponse } from "@/types/water";
 
-function getTownFromPostcode(postcode: string): string {
-  const prefix = postcode.replace(/\s/g, "").substring(0, 2).toUpperCase();
-  const area = postcode.replace(/\s/g, "").substring(0, 1).toUpperCase();
-  const map: Record<string, string> = {
-    PO: "Portsmouth",
-    M: "Manchester",
-    BN: "Brighton",
-    B: "Birmingham",
-    L: "Liverpool",
-    S: "Sheffield",
-    LS: "Leeds",
-    SW: "London",
-    SE: "London",
-    NW: "London",
-    N: "London",
-    E: "London",
-    W: "London",
-    EC: "London",
-    WC: "London",
-    BS: "Bristol",
-    OX: "Oxford",
-    CB: "Cambridge",
-    NG: "Nottingham",
-    AB: "Aberdeen",
-    EH: "Edinburgh",
-    G: "Glasgow",
-    D: "Dublin",
-  };
-  return map[prefix] || map[area] || "your area";
-}
-
 export function WaterLookup() {
   const [postcode, setPostcode] = useState("");
   const [homeBuilt, setHomeBuilt] = useState("");
@@ -181,14 +150,41 @@ export function WaterLookup() {
         </div>
       )}
 
-      {result && scorecardData && (
+      {result && (
         <div className="mt-8 border-t border-slate-200 pt-6">
           <h1 className="mb-4 text-xl font-bold text-slate-800">
-            Water Quality Report for {getTownFromPostcode(result.searchValue)}
+            Water Quality Report
+            {result.data.comingSoon
+              ? ""
+              : result.data.adminDistrict
+                ? ` for ${result.data.adminDistrict}`
+                : ""}
           </h1>
-          <WaterScorecard data={scorecardData} />
-
-          {(() => {
+          {result.data.comingSoon ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 text-xs font-medium uppercase tracking-wider text-slate-500">
+                Water Supplier
+              </div>
+              <div className="mb-6 text-xl font-bold text-slate-800">
+                Scottish Water
+              </div>
+              <p className="text-slate-600">
+                We&apos;re working on bringing Scottish water quality data to the
+                directory. In the meantime, check your local water quality at{" "}
+                <a
+                  href="https://www.scottishwater.co.uk/your-home/your-water/water-quality/water-quality"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-indigo-600 underline hover:text-indigo-700"
+                >
+                  scottishwater.co.uk
+                </a>
+              </p>
+            </div>
+          ) : scorecardData ? (
+            <>
+              <WaterScorecard data={scorecardData} />
+              {(() => {
             const spill = result.data.nearestSpill;
             const spills = spill?.countedSpills ?? 0;
             const hasSpills = spills > 0;
@@ -227,9 +223,8 @@ export function WaterLookup() {
                 </div>
               </div>
             );
-          })()}
-
-          {hasLeadRisk && (
+              })()}
+              {hasLeadRisk && (
             <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
               <div className="font-bold text-amber-800">
                 ⚠️ Lead Pipe Warning
@@ -240,10 +235,9 @@ export function WaterLookup() {
                 risks, especially for children. Consider having your water
                 tested and replacing lead pipes.
               </p>
-            </div>
-          )}
-
-          <div className="mt-6 flex flex-col gap-3">
+              </div>
+            )}
+              <div className="mt-6 flex flex-col gap-3">
             <button
               type="button"
               onClick={() => setLeadModalOpen(true)}
@@ -251,8 +245,10 @@ export function WaterLookup() {
               className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:bg-green-600 disabled:cursor-not-allowed"
             >
               {leadSubmitted ? "Survey Requested ✓" : "Request Professional Water Survey"}
-            </button>
-          </div>
+              </button>
+            </div>
+            </>
+          ) : null}
         </div>
       )}
 

@@ -29,15 +29,12 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
     pfas = "N/A",
     hasLocalSamples,
     supplier,
-    zoneName,
     propertyValueImpact,
     familyHealthScore,
   } = data;
 
+  // Strip anything from first "(" onwards (e.g. "South West Water (SWB)" or zone_name concatenation)
   const displaySupplier = supplier.replace(/\(.*$/, "").trim();
-  const displayName = zoneName
-    ? `${displaySupplier} (${zoneName})`
-    : displaySupplier;
 
   const sourceText = hasLocalSamples
     ? `Source: ${displaySupplier} official lab results 2024`
@@ -48,7 +45,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
       <div className="mb-4 text-xs font-medium uppercase tracking-wider text-slate-500">
         Water Supplier
       </div>
-      <div className="mb-6 text-xl font-bold text-slate-800">{displayName}</div>
+      <div className="mb-6 text-xl font-bold text-slate-800">{displaySupplier}</div>
 
       <div className="mb-6 rounded-lg border border-slate-100 bg-slate-50/50 p-4">
         <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">

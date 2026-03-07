@@ -80,10 +80,116 @@ async function fetchWaterData(
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const apiPcd = formatPostcodeForApi(rawPostcode);
   const lookupPcd = rawPostcode.replace(/\s+/g, "").toUpperCase();
+  const cleanPostcode = lookupPcd;
 
   let lsoa: string | null = null;
   let lat: number | null = null;
   let lng: number | null = null;
+
+  let adminDistrict: string | null = null;
+
+  // 0. NI postcode: lookup via ni_postcode_zones
+  if (cleanPostcode.startsWith("BT")) {
+    // Optional: get town from postcodes.io for NI (returns admin_district e.g. "Belfast")
+    try {
+      const geoRes = await fetch(
+        `https://api.postcodes.io/postcodes/${encodeURIComponent(apiPcd)}`
+      );
+      const geoJson = await geoRes.json();
+      if (geoJson?.result?.admin_district) {
+        adminDistrict = geoJson.result.admin_district;
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const { data: niZone } = await supabase
+      .from("ni_postcode_zones")
+      .select("zone_id")
+      .eq("postcode", cleanPostcode)
+      .maybeSingle();
+
+    if (niZone?.zone_id) {
+      const zoneRes = await supabase
+        .from("water_zones")
+        .select("*")
+        .eq("zone_id", niZone.zone_id)
+        .maybeSingle();
+      const chemRes = await supabase
+        .from("chemical_readings")
+        .select("*")
+        .eq("zone_id", niZone.zone_id);
+
+      const zoneData = zoneRes.data;
+      const chemData = chemRes.data;
+
+      if (zoneData || (chemData && chemData.length > 0)) {
+        const chemicals = {
+          nitrates: null as number | string | null,
+          lead: null as number | string | null,
+          chlorine: null as number | string | null,
+          fluoride: null as number | string | null,
+        };
+        function parseValue(val: string | number | null | undefined): number | string | null {
+          if (val == null || (typeof val === "number" && isNaN(val))) return null;
+          if (typeof val === "string" && val.includes("|")) {
+            const parts = val.split("|");
+            const mean = parts[1]?.trim();
+            return mean ? parseFloat(mean) || mean : null;
+          }
+          const n = Number(val);
+          return isNaN(n) ? String(val) : n;
+        }
+        if (chemData && chemData.length > 0) {
+          chemData.forEach((row: { chemical?: string; parameter?: string; value_raw?: string }) => {
+            let displayVal = row.value_raw;
+            if (displayVal && displayVal.includes("|")) {
+              displayVal = displayVal.split("|")[1]?.trim() ?? displayVal;
+            }
+            const chem = (row.chemical ?? row.parameter ?? "").toUpperCase();
+            const val = parseValue(displayVal);
+            if (chem.includes("LEAD")) chemicals.lead = val;
+            else if (
+              (chem.includes("NITRATE") || chem.includes("NITRATES") || chem.includes("NO3")) &&
+              !chem.includes("NITRITE") &&
+              !chem.includes("NO2")
+            )
+              chemicals.nitrates = val;
+            else if (chem.includes("CHLORINE") || chem.includes("DISINFECTANT")) {
+              if (!chemicals.chlorine || chem.includes("(TOTAL)"))
+                chemicals.chlorine = val;
+            } else if (chem.includes("FLUORIDE")) chemicals.fluoride = val;
+          });
+        }
+        return NextResponse.json({
+          supplier: zoneData?.supplier ?? "Northern Ireland Water",
+          zoneName: zoneData?.zone_name ?? null,
+          adminDistrict,
+          hasLocalSamples: true,
+          chemicals,
+          nearestSpill: null,
+          source: `${zoneData?.supplier ?? "Northern Ireland Water"} 2024 Lab Results`,
+        });
+      }
+    }
+  }
+
+  // Scottish postcodes: return coming soon (skip postcodes.io)
+  const SCOTTISH_PREFIXES = [
+    "EH", "G", "KY", "DD", "PH", "AB", "IV", "KW", "HS", "ZE",
+    "PA", "KA", "ML", "FK", "DG", "TD",
+  ];
+  if (SCOTTISH_PREFIXES.some((p) => cleanPostcode.startsWith(p))) {
+    return NextResponse.json({
+      supplier: "Scottish Water",
+      zoneName: null,
+      hasLocalSamples: false,
+      chemicals: { nitrates: null, lead: null, chlorine: null, fluoride: null },
+      nearestSpill: null,
+      source: "Scottish Water",
+      comingSoon: true,
+    });
+  }
 
   // 1. Postcodes.io: Get LSOA + GPS
   try {
@@ -96,6 +202,7 @@ async function fetchWaterData(
       lsoa = codes?.lsoa ?? codes?.lsoa21 ?? null;
       lat = geoJson.result.latitude;
       lng = geoJson.result.longitude;
+      adminDistrict = geoJson.result.admin_district ?? null;
     }
   } catch (e) {
     console.warn("Postcodes.io failed:", e);
@@ -145,8 +252,8 @@ async function fetchWaterData(
       source = `${zoneData?.supplier ?? "Water Supplier"} 2024 Lab Results`;
 
       if (chemData && chemData.length > 0) {
-        // Map DB chemical names to scorecard slots (handles Anglian, Cambridge, Thames variants)
-        // DB names: Nitrate, Nitrate as NO3 | Lead as Pb, Lead | Chlorine (Residual), Chlorine (Total), CHLORINE | Fluoride as F, Fluoride
+        // Map DB chemical names to scorecard slots (handles Anglian, Cambridge, Thames, NI variants)
+        // DB names: Nitrate, Nitrate as NO3, NO3 | Lead as Pb, Lead | Chlorine (Residual), Chlorine (Total) | Fluoride
         chemData.forEach((row: { chemical?: string; value_raw?: string }) => {
           let displayVal = row.value_raw;
           if (displayVal && displayVal.includes("|")) {
@@ -155,7 +262,11 @@ async function fetchWaterData(
           const chem = (row.chemical || "").toUpperCase();
           const val = parseValue(displayVal);
           if (chem.includes("LEAD")) chemicals.lead = val;
-          else if (chem.includes("NITRATE") || chem.includes("NITRATES"))
+          else if (
+            (chem.includes("NITRATE") || chem.includes("NITRATES") || chem.includes("NO3")) &&
+            !chem.includes("NITRITE") &&
+            !chem.includes("NO2")
+          )
             chemicals.nitrates = val;
           else if (chem.includes("CHLORINE") || chem.includes("DISINFECTANT")) {
             // Prefer Chlorine (Total) over Chlorine (Residual) when both exist
@@ -257,6 +368,7 @@ async function fetchWaterData(
   return NextResponse.json({
     supplier,
     zoneName,
+    adminDistrict,
     hasLocalSamples,
     chemicals,
     nearestSpill,

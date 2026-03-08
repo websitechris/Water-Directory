@@ -10,6 +10,7 @@ export type WaterApiResponse = {
     lead: number | string | null;
     chlorine: number | string | null;
     fluoride: number | string | null;
+    hardness: number | null;
   };
   nearestSpill: {
     siteName: string;

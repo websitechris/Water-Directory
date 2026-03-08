@@ -93,6 +93,7 @@ export function WaterLookup() {
         lead: result.data.chemicals.lead,
         chlorine: result.data.chemicals.chlorine,
         fluoride: result.data.chemicals.fluoride,
+        hardness: result.data.chemicals.hardness ?? null,
         pfas: "N/A",
         hasLocalSamples: result.data.hasLocalSamples,
         supplier: result.data.supplier,

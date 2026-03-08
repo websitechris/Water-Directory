@@ -5,6 +5,7 @@ export type WaterScorecardData = {
   lead: number | string | null;
   chlorine: number | string | null;
   fluoride: number | string | null;
+  hardness: number | null;
   pfas?: string;
   hasLocalSamples: boolean;
   supplier: string;
@@ -92,6 +93,86 @@ const GAUGE_CONFIG: Record<string, GaugeConfig> = {
   },
 };
 
+// Hardness: 0–100 Soft (blue), 101–200 Moderately Hard (green), 201–300 Hard (amber), 300+ Very Hard (red)
+const HARDNESS_MAX = 400;
+
+function getHardnessCategory(val: number): "soft" | "moderate" | "hard" | "veryhard" {
+  if (val <= 100) return "soft";
+  if (val <= 200) return "moderate";
+  if (val <= 300) return "hard";
+  return "veryhard";
+}
+
+function HardnessGaugeBar({ value }: { value: number | null }) {
+  const num = value;
+  if (num === null) {
+    return (
+      <div className="mt-3">
+        <div className="h-3 w-full overflow-hidden rounded-full bg-[#e2e8f0]" />
+        <div className="mt-1 flex justify-between text-xs text-[#64748b]">
+          <span>0</span>
+          <span>mg/L CaCO₃</span>
+        </div>
+        <p className="mt-2 text-sm text-[#64748b]">—</p>
+      </div>
+    );
+  }
+
+  const category = getHardnessCategory(num);
+  const labels = {
+    soft: "Soft",
+    moderate: "Moderately Hard",
+    hard: "Hard",
+    veryhard: "Very Hard",
+  };
+  const colors = {
+    soft: "text-[#2563eb]",
+    moderate: "text-[#22c55e]",
+    hard: "text-[#d97706]",
+    veryhard: "text-[#dc2626]",
+  };
+  const pct = Math.min((num / HARDNESS_MAX) * 100, 98);
+
+  return (
+    <div className="mt-3">
+      <div className="relative h-3 w-full overflow-hidden rounded-full bg-[#e2e8f0]">
+        {/* 0–100: Soft (blue) */}
+        <div
+          className="absolute left-0 top-0 h-full rounded-l-full bg-[#2563eb]"
+          style={{ width: "25%" }}
+        />
+        {/* 100–200: Moderately Hard (green) */}
+        <div
+          className="absolute top-0 h-full bg-[#22c55e]"
+          style={{ left: "25%", width: "25%" }}
+        />
+        {/* 200–300: Hard (amber) */}
+        <div
+          className="absolute top-0 h-full bg-[#d97706]"
+          style={{ left: "50%", width: "25%" }}
+        />
+        {/* 300+: Very Hard (red) */}
+        <div
+          className="absolute right-0 top-0 h-full rounded-r-full bg-[#dc2626]"
+          style={{ width: "25%" }}
+        />
+        {/* Marker */}
+        <div
+          className="absolute top-1/2 h-5 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0f2942] shadow-md"
+          style={{ left: `${pct}%` }}
+        />
+      </div>
+      <div className="mt-1 flex justify-between text-xs text-[#64748b]">
+        <span>0</span>
+        <span>mg/L CaCO₃</span>
+      </div>
+      <p className={`mt-2 text-sm font-medium ${colors[category]}`}>
+        {labels[category]}
+      </p>
+    </div>
+  );
+}
+
 function getZone(
   val: number | null,
   config: GaugeConfig
@@ -171,6 +252,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
     lead,
     chlorine,
     fluoride,
+    hardness,
     pfas = "N/A",
     hasLocalSamples,
     supplier,
@@ -187,6 +269,8 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
     { key: "fluoride" as const, value: fluoride, config: GAUGE_CONFIG.fluoride },
     { key: "lead" as const, value: lead, config: GAUGE_CONFIG.lead },
   ];
+
+  const hardnessNum = hardness != null && !isNaN(hardness) ? hardness : null;
 
   return (
     <div className="mt-6">
@@ -214,6 +298,30 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
             <GaugeBar value={value} config={config} />
           </div>
         ))}
+
+        {hardnessNum !== null && (
+          <div className="rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-4">
+            <div className="flex items-baseline justify-between">
+              <p className="font-semibold text-[#0f2942]">Hardness</p>
+              <p className="font-bold tabular-nums text-lg text-[#1e293b]">
+                {hardnessNum.toFixed(0)}
+              </p>
+            </div>
+            <p className="text-xs text-[#64748b]">mg/L CaCO₃</p>
+            <HardnessGaugeBar value={hardnessNum} />
+            {hardnessNum > 200 && (
+              <a
+                href="https://www.harveywatersofteners.co.uk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 block rounded-lg border border-[#0f2942]/10 bg-white p-3 text-sm text-[#1e293b] transition hover:border-[#0891b2]/30 hover:shadow-sm"
+              >
+                Hard water can damage appliances and affect skin. Consider a water
+                softener →
+              </a>
+            )}
+          </div>
+        )}
 
         <div className="rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-4">
           <p className="font-semibold text-[#0f2942]">PFAS risk</p>

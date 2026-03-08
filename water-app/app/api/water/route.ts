@@ -68,7 +68,7 @@ async function fetchWaterData(
         supplier: "Your Area",
         zoneName: null,
         hasLocalSamples: false,
-        chemicals: { nitrates: null, lead: null, chlorine: null, fluoride: null },
+        chemicals: { nitrates: null, lead: null, chlorine: null, fluoride: null, hardness: null },
         nearestSpill: null,
         source: "Water quality data",
         error: "Server misconfiguration: missing Supabase credentials",
@@ -129,6 +129,7 @@ async function fetchWaterData(
           lead: null as number | string | null,
           chlorine: null as number | string | null,
           fluoride: null as number | string | null,
+          hardness: null as number | null,
         };
         function parseValue(val: string | number | null | undefined): number | string | null {
           if (val == null || (typeof val === "number" && isNaN(val))) return null;
@@ -158,7 +159,11 @@ async function fetchWaterData(
             else if (chem.includes("CHLORINE") || chem.includes("DISINFECTANT")) {
               if (!chemicals.chlorine || chem.includes("(TOTAL)"))
                 chemicals.chlorine = val;
-            } else if (chem.includes("FLUORIDE")) chemicals.fluoride = val;
+            }             else if (chem.includes("FLUORIDE")) chemicals.fluoride = val;
+            else if (chem.includes("HARDNESS") && chem.includes("CACO3")) {
+              const n = typeof val === "number" ? val : (typeof val === "string" ? parseFloat(val.replace(/</g, "")) : null);
+              chemicals.hardness = n != null && !isNaN(n) ? n : null;
+            }
           });
         }
         return NextResponse.json({
@@ -184,7 +189,7 @@ async function fetchWaterData(
       supplier: "Scottish Water",
       zoneName: null,
       hasLocalSamples: false,
-      chemicals: { nitrates: null, lead: null, chlorine: null, fluoride: null },
+      chemicals: { nitrates: null, lead: null, chlorine: null, fluoride: null, hardness: null },
       nearestSpill: null,
       source: "Scottish Water",
       comingSoon: true,
@@ -217,6 +222,7 @@ async function fetchWaterData(
     lead: null as number | string | null,
     chlorine: null as number | string | null,
     fluoride: null as number | string | null,
+    hardness: null as number | null,
   };
 
   function parseValue(val: string | number | null | undefined): number | string | null {
@@ -273,6 +279,10 @@ async function fetchWaterData(
             if (!chemicals.chlorine || chem.includes("(TOTAL)"))
               chemicals.chlorine = val;
           } else if (chem.includes("FLUORIDE")) chemicals.fluoride = val;
+          else if (chem.includes("HARDNESS") && chem.includes("CACO3")) {
+            const n = typeof val === "number" ? val : (typeof val === "string" ? parseFloat(val.replace(/</g, "")) : null);
+            chemicals.hardness = n != null && !isNaN(n) ? n : null;
+          }
         });
       }
     }
@@ -302,6 +312,8 @@ async function fetchWaterData(
           else if (d === "CHLORINE" || d === "CHLORIDE")
             chemicals.chlorine = chemicals.chlorine ?? val;
           else if (d === "FLUORIDE") chemicals.fluoride = chemicals.fluoride ?? val;
+          else if ((d === "HARDNESS" || d === "CACO3") && chemicals.hardness == null)
+            chemicals.hardness = typeof val === "number" ? val : null;
         });
       }
     }
@@ -325,6 +337,12 @@ async function fetchWaterData(
             chemicals.chlorine = val;
           else if (d === "FLUORIDE" && chemicals.fluoride == null)
             chemicals.fluoride = val;
+          else if (
+            (d === "HARDNESS" || d === "CACO3") &&
+            chemicals.hardness == null &&
+            typeof val === "number"
+          )
+            chemicals.hardness = val;
         });
       }
     }

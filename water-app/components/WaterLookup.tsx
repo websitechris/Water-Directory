@@ -103,159 +103,238 @@ export function WaterLookup() {
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
-      <h2 className="mb-2 text-2xl font-bold text-slate-800">💧 Water Lookup</h2>
-      <p className="mb-6 text-slate-600">
-        Enter your postcode to find your supplier
-      </p>
-
-      <form onSubmit={handleSearch} className="space-y-4">
-        <input
-          type="text"
-          value={postcode}
-          onChange={(e) => setPostcode(e.target.value)}
-          placeholder="Enter your UK Postcode or Eircode"
-          className="w-full rounded-lg border-2 border-slate-200 px-4 py-3 text-slate-800 focus:border-indigo-500 focus:outline-none"
-        />
-        <label className="block text-left text-sm font-medium text-slate-600">
-          When was your home built?
-        </label>
-        <select
-          value={homeBuilt}
-          onChange={(e) => setHomeBuilt(e.target.value)}
-          className="w-full rounded-lg border-2 border-slate-200 px-4 py-3 text-slate-800 focus:border-indigo-500 focus:outline-none"
-        >
-          <option value="">Select...</option>
-          <option value="pre-1970">Pre-1970</option>
-          <option value="post-1970">Post-1970</option>
-        </select>
-        <button
-          type="submit"
-          disabled={loading}
-          className={`w-full rounded-lg px-4 py-3 font-bold text-white transition ${
-            loading
-              ? "cursor-not-allowed animate-pulse bg-indigo-400"
-              : "bg-indigo-600 hover:bg-indigo-700"
-          }`}
-        >
-          {loading
-            ? "🔍 Analyzing local lab results & sewage data (this can take 10-15s)..."
-            : "Search"}
-        </button>
-      </form>
-
-      {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-4 text-red-700">
-          {error}
-        </div>
-      )}
-
-      {result && (
-        <div className="mt-8 border-t border-slate-200 pt-6">
-          <h1 className="mb-4 text-xl font-bold text-slate-800">
-            Water Quality Report
-            {result.data.comingSoon
-              ? ""
-              : result.data.adminDistrict
-                ? ` for ${result.data.adminDistrict}`
-                : ""}
+    <>
+      {/* Hero — postcode search */}
+      <section className="px-4 pt-12 pb-10 sm:pt-16 sm:pb-12">
+        <div className="mx-auto max-w-2xl">
+          <h1 className="text-center text-3xl font-bold tracking-tight text-[#0f2942] sm:text-4xl">
+            What&apos;s actually in your tap water?
           </h1>
-          {result.data.comingSoon ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-4 text-xs font-medium uppercase tracking-wider text-slate-500">
-                Water Supplier
-              </div>
-              <div className="mb-6 text-xl font-bold text-slate-800">
-                Scottish Water
-              </div>
-              <p className="text-slate-600">
-                We&apos;re working on bringing Scottish water quality data to the
-                directory. In the meantime, check your local water quality at{" "}
-                <a
-                  href="https://www.scottishwater.co.uk/your-home/your-water/water-quality/water-quality"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-indigo-600 underline hover:text-indigo-700"
-                >
-                  scottishwater.co.uk
-                </a>
-              </p>
-            </div>
-          ) : scorecardData ? (
-            <>
-              <WaterScorecard data={scorecardData} />
-              {(() => {
-            const spill = result.data.nearestSpill;
-            const spills = spill?.countedSpills ?? 0;
-            const hasSpills = spills > 0;
+          <p className="mt-3 text-center text-base text-[#1e293b]/80 sm:text-lg">
+            Real 2024 lab data for every UK postcode
+          </p>
 
-            return (
-              <div
-                className={`mt-6 rounded-lg border p-4 ${
-                  hasSpills
-                    ? "border-red-200 bg-red-50"
-                    : "border-slate-200 bg-slate-50"
-                }`}
-              >
-                <div
-                  className={`text-sm font-bold ${
-                    hasSpills ? "text-red-800" : "text-slate-700"
-                  }`}
-                >
-                  {hasSpills ? "Local Pollution Alert" : "No Spills Recorded Near You"}
-                </div>
-                {hasSpills ? (
-                  <>
-                    <div className="mt-1 font-semibold text-red-700">
-                      {spill!.siteName}
-                    </div>
-                    <div className="text-sm text-red-600">
-                      {spill!.countedSpills.toLocaleString()}{" "}
-                      {spill!.countedSpills === 1 ? "spill" : "spills"}
-                      {spill!.totalDurationHrs != null && spill!.totalDurationHrs > 0
-                        ? ` · ${spill!.totalDurationHrs.toFixed(1)} hrs total`
-                        : " recorded"}
-                    </div>
-                  </>
-                ) : null}
-                <div className={`mt-1 text-xs ${hasSpills ? "text-red-500" : "text-slate-500"}`}>
-                  Source: Rivers Trust 2024 EDM
-                </div>
-              </div>
-            );
-              })()}
-              {hasLeadRisk && (
-            <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
-              <div className="font-bold text-amber-800">
-                ⚠️ Lead Pipe Warning
-              </div>
-              <p className="mt-1 text-sm text-amber-700">
-                Homes built before 1970 often have lead pipes or lead solder in
-                plumbing. Lead can leach into drinking water and pose health
-                risks, especially for children. Consider having your water
-                tested and replacing lead pipes.
-              </p>
-              </div>
-            )}
-              <div className="mt-6 flex flex-col gap-3">
+          <form
+            onSubmit={handleSearch}
+            className="mt-8 flex flex-col gap-4 sm:flex-row sm:gap-3"
+          >
+            <input
+              type="text"
+              value={postcode}
+              onChange={(e) => setPostcode(e.target.value)}
+              placeholder="Enter postcode or Eircode"
+              className="min-h-[52px] flex-1 rounded-lg border-2 border-[#0f2942]/20 bg-white px-4 py-3 text-lg text-[#1e293b] placeholder:text-[#64748b] focus:border-[#0891b2] focus:outline-none"
+            />
             <button
-              type="button"
-              onClick={() => setLeadModalOpen(true)}
-              disabled={leadSubmitted}
-              className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:bg-green-600 disabled:cursor-not-allowed"
+              type="submit"
+              disabled={loading}
+              className="min-h-[52px] rounded-lg bg-[#0891b2] px-8 font-semibold text-white transition hover:bg-[#0e7490] disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {leadSubmitted ? "Survey Requested ✓" : "Request Professional Water Survey"}
-              </button>
+              {loading ? "Searching…" : "Search"}
+            </button>
+          </form>
+
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:gap-6">
+            <label className="flex items-center gap-2 text-sm text-[#1e293b]">
+              <span className="font-medium">When was your home built?</span>
+              <select
+                value={homeBuilt}
+                onChange={(e) => setHomeBuilt(e.target.value)}
+                className="rounded border border-[#0f2942]/20 bg-white px-3 py-1.5 text-[#1e293b] focus:border-[#0891b2] focus:outline-none"
+              >
+                <option value="">Select…</option>
+                <option value="pre-1970">Pre-1970</option>
+                <option value="post-1970">Post-1970</option>
+              </select>
+            </label>
+          </div>
+
+          {error && (
+            <div className="mt-4 rounded-lg border border-[#dc2626]/30 bg-[#dc2626]/10 p-4 text-[#dc2626]">
+              {error}
             </div>
-            </>
-          ) : null}
+          )}
         </div>
+      </section>
+
+      {/* Stats + audience entry points — always visible below search */}
+      <section className="border-t border-[#0f2942]/10 px-4 py-12 sm:py-16">
+        <div className="mx-auto max-w-4xl">
+          <div className="grid gap-8 sm:grid-cols-3">
+            <div className="text-center">
+              <p className="font-bold tabular-nums text-3xl text-[#0891b2] sm:text-4xl">
+                13
+              </p>
+              <p className="mt-1 text-sm font-medium text-[#0f2942]">
+                water companies covered
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="font-bold tabular-nums text-3xl text-[#0891b2] sm:text-4xl">
+                90,000+
+              </p>
+              <p className="mt-1 text-sm font-medium text-[#0f2942]">
+                zones mapped
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="font-bold tabular-nums text-3xl text-[#0891b2] sm:text-4xl">
+                DWI
+              </p>
+              <p className="mt-1 text-sm font-medium text-[#0f2942]">
+                real lab data
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-8 text-center text-sm text-[#64748b]">
+            Data sourced from the Drinking Water Inspectorate via the Stream open
+            data initiative
+          </p>
+
+          <div className="mt-10 grid gap-6 sm:grid-cols-3">
+            <a
+              href="/water-quality-for-babies"
+              className="block rounded-lg border border-[#0f2942]/10 bg-white p-6 transition hover:border-[#0891b2]/30 hover:shadow-md"
+            >
+              <p className="font-semibold text-[#0f2942]">New baby at home?</p>
+              <p className="mt-2 text-sm text-[#64748b]">
+                Nitrates, lead and formula — what parents need to know
+              </p>
+              <p className="mt-3 text-sm font-medium text-[#0891b2]">
+                Parents hub →
+              </p>
+            </a>
+            <a
+              href="/hard-water-skin-health"
+              className="block rounded-lg border border-[#0f2942]/10 bg-white p-6 transition hover:border-[#0891b2]/30 hover:shadow-md"
+            >
+              <p className="font-semibold text-[#0f2942]">Dry skin or eczema?</p>
+              <p className="mt-2 text-sm text-[#64748b]">
+                Hard water and skin — the evidence
+              </p>
+              <p className="mt-3 text-sm font-medium text-[#0891b2]">
+                Skin & health hub →
+              </p>
+            </a>
+            <a
+              href="/water-quality-home-buying"
+              className="block rounded-lg border border-[#0f2942]/10 bg-white p-6 transition hover:border-[#0891b2]/30 hover:shadow-md"
+            >
+              <p className="font-semibold text-[#0f2942]">Just bought a house?</p>
+              <p className="mt-2 text-sm text-[#64748b]">
+                What to check before you exchange
+              </p>
+              <p className="mt-3 text-sm font-medium text-[#0891b2]">
+                Homebuyers hub →
+              </p>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Results */}
+      {result && (
+        <section className="border-t border-[#0f2942]/10 bg-white px-4 py-10 sm:py-14">
+          <div className="mx-auto max-w-2xl">
+            <h2 className="text-xl font-bold text-[#0f2942] sm:text-2xl">
+              Water Quality Report
+              {result.data.comingSoon
+                ? ""
+                : result.data.adminDistrict
+                  ? ` for ${result.data.adminDistrict}`
+                  : ""}
+            </h2>
+
+            {result.data.comingSoon ? (
+              <div className="mt-6 rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-6">
+                <p className="font-semibold text-[#0f2942]">Scottish Water</p>
+                <p className="mt-2 text-[#1e293b]">
+                  We&apos;re working on bringing Scottish water quality data to the
+                  directory. In the meantime, check your local water quality at{" "}
+                  <a
+                    href="https://www.scottishwater.co.uk/your-home/your-water/water-quality/water-quality"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-[#0891b2] underline hover:text-[#0e7490]"
+                  >
+                    scottishwater.co.uk
+                  </a>
+                </p>
+              </div>
+            ) : scorecardData ? (
+              <>
+                <WaterScorecard data={scorecardData} />
+                {(() => {
+                  const spill = result.data.nearestSpill;
+                  const spills = spill?.countedSpills ?? 0;
+                  const hasSpills = spills > 0;
+                  return (
+                    <div
+                      className={`mt-6 rounded-lg border p-4 ${
+                        hasSpills
+                          ? "border-[#dc2626]/30 bg-[#dc2626]/5"
+                          : "border-[#0f2942]/10 bg-[#f8fafc]"
+                      }`}
+                    >
+                      <p
+                        className={`text-sm font-semibold ${
+                          hasSpills ? "text-[#dc2626]" : "text-[#0f2942]"
+                        }`}
+                      >
+                        {hasSpills ? "Local Pollution Alert" : "No Spills Recorded Near You"}
+                      </p>
+                      {hasSpills && spill && (
+                        <>
+                          <p className="mt-1 font-medium text-[#1e293b]">
+                            {spill.siteName}
+                          </p>
+                          <p className="text-sm text-[#64748b]">
+                            {spill.countedSpills.toLocaleString()}{" "}
+                            {spill.countedSpills === 1 ? "spill" : "spills"}
+                            {spill.totalDurationHrs != null && spill.totalDurationHrs > 0
+                              ? ` · ${spill.totalDurationHrs.toFixed(1)} hrs total`
+                              : " recorded"}
+                          </p>
+                        </>
+                      )}
+                      <p className="mt-1 text-xs text-[#64748b]">
+                        Source: Rivers Trust 2024 EDM
+                      </p>
+                    </div>
+                  );
+                })()}
+                {hasLeadRisk && (
+                  <div className="mt-6 rounded-lg border border-[#d97706]/30 bg-[#d97706]/5 p-4">
+                    <p className="font-semibold text-[#d97706]">Lead pipe warning</p>
+                    <p className="mt-1 text-sm text-[#1e293b]">
+                      Homes built before 1970 often have lead pipes or lead solder in
+                      plumbing. Lead can leach into drinking water and pose health
+                      risks, especially for children. Consider having your water
+                      tested and replacing lead pipes.
+                    </p>
+                  </div>
+                )}
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setLeadModalOpen(true)}
+                    disabled={leadSubmitted}
+                    className="rounded-lg bg-[#0f2942] px-4 py-2 font-semibold text-white hover:bg-[#1e3a5f] disabled:cursor-not-allowed disabled:bg-[#22c55e]"
+                  >
+                    {leadSubmitted ? "Survey requested ✓" : "Request professional water survey"}
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </section>
       )}
 
       {/* Lead Modal */}
       {leadModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => !leadSubmitted && setLeadModalOpen(false)}
         >
           <div
@@ -264,31 +343,30 @@ export function WaterLookup() {
           >
             {leadSubmitted ? (
               <div className="text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-2xl font-bold text-white">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#22c55e] text-2xl font-bold text-white">
                   ✓
                 </div>
-                <h3 className="text-xl font-bold text-green-700">Thank You!</h3>
-                <p className="mt-2 text-slate-600">
-                  Your request has been securely received. One of our local water
-                  quality experts will review your property details and contact
-                  you shortly.
+                <h3 className="text-xl font-bold text-[#0f2942]">Thank you</h3>
+                <p className="mt-2 text-[#64748b]">
+                  Your request has been received. A local water quality expert will
+                  contact you shortly.
                 </p>
                 <button
                   type="button"
                   onClick={() => setLeadModalOpen(false)}
-                  className="mt-4 rounded-lg bg-green-600 px-6 py-2 font-semibold text-white hover:bg-green-700"
+                  className="mt-4 rounded-lg bg-[#0891b2] px-6 py-2 font-semibold text-white"
                 >
                   Close
                 </button>
               </div>
             ) : (
               <>
-                <h3 className="mb-4 text-xl font-bold text-slate-800">
-                  Request Professional Water Survey
+                <h3 className="text-xl font-bold text-[#0f2942]">
+                  Request professional water survey
                 </h3>
-                <form onSubmit={handleLeadSubmit} className="space-y-4">
+                <form onSubmit={handleLeadSubmit} className="mt-4 space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-600">
+                    <label className="block text-sm font-medium text-[#1e293b]">
                       Name
                     </label>
                     <input
@@ -296,11 +374,11 @@ export function WaterLookup() {
                       name="name"
                       required
                       placeholder="Your name"
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                      className="mt-1 w-full rounded-lg border border-[#0f2942]/20 px-3 py-2 focus:border-[#0891b2] focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-600">
+                    <label className="block text-sm font-medium text-[#1e293b]">
                       Email
                     </label>
                     <input
@@ -308,11 +386,11 @@ export function WaterLookup() {
                       name="email"
                       required
                       placeholder="you@example.com"
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                      className="mt-1 w-full rounded-lg border border-[#0f2942]/20 px-3 py-2 focus:border-[#0891b2] focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-600">
+                    <label className="block text-sm font-medium text-[#1e293b]">
                       Postcode
                     </label>
                     <input
@@ -320,39 +398,35 @@ export function WaterLookup() {
                       name="postcode"
                       placeholder="e.g. BN11 3BY"
                       defaultValue={result?.searchValue}
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                      className="mt-1 w-full rounded-lg border border-[#0f2942]/20 px-3 py-2 focus:border-[#0891b2] focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-600">
-                      Property Age
+                    <label className="block text-sm font-medium text-[#1e293b]">
+                      Property age
                     </label>
                     <select
                       name="property_age"
                       defaultValue={homeBuilt}
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                      className="mt-1 w-full rounded-lg border border-[#0f2942]/20 px-3 py-2 focus:border-[#0891b2] focus:outline-none"
                     >
-                      <option value="">Select...</option>
+                      <option value="">Select…</option>
                       <option value="pre-1970">Pre-1970</option>
                       <option value="post-1970">Post-1970</option>
                     </select>
                   </div>
-                  <input
-                    type="hidden"
-                    name="interest_type"
-                    value=""
-                  />
+                  <input type="hidden" name="interest_type" value="" />
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
                       onClick={() => setLeadModalOpen(false)}
-                      className="flex-1 rounded-lg border border-slate-300 bg-slate-100 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-200"
+                      className="flex-1 rounded-lg border border-[#0f2942]/20 bg-[#f8fafc] px-4 py-2 font-semibold text-[#1e293b]"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700"
+                      className="flex-1 rounded-lg bg-[#0891b2] px-4 py-2 font-semibold text-white"
                     >
                       Submit
                     </button>
@@ -363,6 +437,6 @@ export function WaterLookup() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

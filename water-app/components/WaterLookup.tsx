@@ -1,12 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { WaterScorecard } from "./WaterScorecard";
 import type { WaterScorecardData } from "./WaterScorecard";
 import type { WaterApiResponse } from "@/types/water";
 
-export function WaterLookup() {
-  const [postcode, setPostcode] = useState("");
+const loadingSteps = [
+  "Looking up your postcode...",
+  "Finding your water supplier...",
+  "Fetching lab results...",
+  "Checking chemical levels...",
+  "Checking storm overflow records...",
+  "Building your water report...",
+];
+
+type WaterLookupProps = {
+  initialPostcode?: string;
+};
+
+export function WaterLookup({ initialPostcode }: WaterLookupProps) {
+  const router = useRouter();
+  const lastUrlPostcode = useRef<string | null>(null);
+  const [postcode, setPostcode] = useState(initialPostcode ?? "");
   const [homeBuilt, setHomeBuilt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,37 +32,58 @@ export function WaterLookup() {
   } | null>(null);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [leadSubmitted, setLeadSubmitted] = useState(false);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
-  async function handleSearch(e: React.FormEvent) {
+  useEffect(() => {
+    if (!loading) return;
+    setLoadingMessageIndex(0);
+    const id = setInterval(() => {
+      setLoadingMessageIndex((i) => (i + 1) % loadingSteps.length);
+    }, 800);
+    return () => clearInterval(id);
+  }, [loading]);
+
+  // Auto-search when landing with postcode in URL
+  useEffect(() => {
+    if (!initialPostcode?.trim()) {
+      lastUrlPostcode.current = null;
+      return;
+    }
+    const raw = initialPostcode.trim();
+    if (lastUrlPostcode.current === raw) return;
+    lastUrlPostcode.current = raw;
+    setPostcode(raw);
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    fetch(`/api/water?postcode=${encodeURIComponent(raw)}`)
+      .then((res) => res.json())
+      .then((data: WaterApiResponse) => {
+        if (!data.error) {
+          const searchValue =
+            raw.length === 3 ? raw : raw.replace(/\s+/g, " ").trim().toUpperCase();
+          setResult({ data, searchValue });
+        } else {
+          setError(data.error || "Search failed");
+        }
+      })
+      .catch(() => setError("Search failed. Please try again."))
+      .finally(() => setLoading(false));
+  }, [initialPostcode]);
+
+  function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     const raw = postcode.trim();
     if (!raw) {
       alert("Please enter a postcode or Eircode");
       return;
     }
-
+    const formatted =
+      raw.length === 3 ? raw : raw.replace(/\s+/g, " ").trim().toUpperCase();
     setLoading(true);
     setError(null);
     setResult(null);
-
-    try {
-      const res = await fetch(`/api/water?postcode=${encodeURIComponent(raw)}`);
-      const data: WaterApiResponse = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Search failed");
-        return;
-      }
-
-      const searchValue =
-        raw.length === 3 ? raw : raw.replace(/\s+/g, " ").trim().toUpperCase();
-      setResult({ data, searchValue });
-    } catch (err) {
-      setError("Search failed. Please try again.");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    router.push(`/?postcode=${encodeURIComponent(formatted)}`);
   }
 
   async function handleLeadSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -94,12 +131,12 @@ export function WaterLookup() {
         chlorine: result.data.chemicals.chlorine,
         fluoride: result.data.chemicals.fluoride,
         hardness: result.data.chemicals.hardness ?? null,
-        pfas: "N/A",
         hasLocalSamples: result.data.hasLocalSamples,
         supplier: result.data.supplier,
         zoneName: result.data.zoneName,
         propertyValueImpact: hasLeadRisk ? "high" : "low",
         familyHealthScore: familyWarning ? "review" : "good",
+        sewageSpills: result.data.sewageSpills,
       }
     : null;
 
@@ -164,7 +201,7 @@ export function WaterLookup() {
           <div className="grid gap-8 sm:grid-cols-3">
             <div className="text-center">
               <p className="font-bold tabular-nums text-3xl text-[#0891b2] sm:text-4xl">
-                13
+                15
               </p>
               <p className="mt-1 text-sm font-medium text-[#0f2942]">
                 water companies covered
@@ -172,7 +209,7 @@ export function WaterLookup() {
             </div>
             <div className="text-center">
               <p className="font-bold tabular-nums text-3xl text-[#0891b2] sm:text-4xl">
-                90,000+
+                100,000+
               </p>
               <p className="mt-1 text-sm font-medium text-[#0f2942]">
                 zones mapped
@@ -234,6 +271,19 @@ export function WaterLookup() {
         </div>
       </section>
 
+      {loading && (
+        <section className="border-t border-[#0f2942]/10 bg-white px-4 py-10 sm:py-14">
+          <div className="mx-auto max-w-2xl">
+            <div className="flex flex-col items-center gap-3 py-12">
+              <div className="w-8 h-8 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-600 text-sm animate-pulse">
+                {loadingSteps[loadingMessageIndex]}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Results */}
       {result && (
         <section className="border-t border-[#0f2942]/10 bg-white px-4 py-10 sm:py-14">
@@ -266,45 +316,6 @@ export function WaterLookup() {
             ) : scorecardData ? (
               <>
                 <WaterScorecard data={scorecardData} />
-                {(() => {
-                  const spill = result.data.nearestSpill;
-                  const spills = spill?.countedSpills ?? 0;
-                  const hasSpills = spills > 0;
-                  return (
-                    <div
-                      className={`mt-6 rounded-lg border p-4 ${
-                        hasSpills
-                          ? "border-[#dc2626]/30 bg-[#dc2626]/5"
-                          : "border-[#0f2942]/10 bg-[#f8fafc]"
-                      }`}
-                    >
-                      <p
-                        className={`text-sm font-semibold ${
-                          hasSpills ? "text-[#dc2626]" : "text-[#0f2942]"
-                        }`}
-                      >
-                        {hasSpills ? "Local Pollution Alert" : "No Spills Recorded Near You"}
-                      </p>
-                      {hasSpills && spill && (
-                        <>
-                          <p className="mt-1 font-medium text-[#1e293b]">
-                            {spill.siteName}
-                          </p>
-                          <p className="text-sm text-[#64748b]">
-                            {spill.countedSpills.toLocaleString()}{" "}
-                            {spill.countedSpills === 1 ? "spill" : "spills"}
-                            {spill.totalDurationHrs != null && spill.totalDurationHrs > 0
-                              ? ` · ${spill.totalDurationHrs.toFixed(1)} hrs total`
-                              : " recorded"}
-                          </p>
-                        </>
-                      )}
-                      <p className="mt-1 text-xs text-[#64748b]">
-                        Source: Rivers Trust 2024 EDM
-                      </p>
-                    </div>
-                  );
-                })()}
                 {hasLeadRisk && (
                   <div className="mt-6 rounded-lg border border-[#d97706]/30 bg-[#d97706]/5 p-4">
                     <p className="font-semibold text-[#d97706]">Lead pipe warning</p>

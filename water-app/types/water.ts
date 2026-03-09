@@ -1,3 +1,11 @@
+export interface SpillSite {
+  name: string;
+  spills: number;
+  hours: number;
+  year: string;
+  company: string;
+}
+
 export type WaterApiResponse = {
   supplier: string;
   zoneName: string | null;
@@ -12,11 +20,7 @@ export type WaterApiResponse = {
     fluoride: number | string | null;
     hardness: number | null;
   };
-  nearestSpill: {
-    siteName: string;
-    countedSpills: number;
-    totalDurationHrs: number;
-  } | null;
+  sewageSpills?: SpillSite[];
   source: string;
   error?: string;
 };

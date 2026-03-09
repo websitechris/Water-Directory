@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import type { WaterApiResponse } from "@/types/water";
+import type { WaterApiResponse, SpillSite } from "@/types/water";
+
+export const dynamic = "force-dynamic";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!;
@@ -11,30 +13,172 @@ function formatPostcodeForApi(raw: string): string {
   return s.slice(0, -3) + " " + s.slice(-3);
 }
 
-function haversineKm(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+async function getSewageSpills(lat: number, lng: number) {
+  const url = new URL(
+    "https://services1.arcgis.com/JZM7qJpmv7vJ0Hzx/arcgis/rest/services/edm_data_full_names/FeatureServer/0/query"
+  );
+  url.searchParams.set("geometry", JSON.stringify({ x: lng, y: lat }));
+  url.searchParams.set("geometryType", "esriGeometryPoint");
+  url.searchParams.set("spatialRel", "esriSpatialRelIntersects");
+  url.searchParams.set("distance", "2000");
+  url.searchParams.set("units", "esriSRUnit_Meter");
+  url.searchParams.set("inSR", "4326");
+  url.searchParams.set(
+    "outFields",
+    "Site_Name_EA_Consents_Database_,Counted_spills_using_12_24h_cou,Total_Duration__hrs__all_spills,year,Water_Company_Name"
+  );
+  url.searchParams.set("orderByFields", "year DESC");
+  url.searchParams.set("resultRecordCount", "100");
+  url.searchParams.set("f", "json");
+
+  try {
+    const res = await fetch(url.toString(), { next: { revalidate: 86400 } });
+    const data = await res.json();
+    if (!data.features?.length) return [];
+
+    // Group all years per site
+    const sitesByName = new Map<string, Record<string, unknown>[]>();
+    for (const f of data.features) {
+      const a = f.attributes as Record<string, unknown>;
+      const name = (a.Site_Name_EA_Consents_Database_ ?? "Unknown site") as string;
+      const key = name.trim().toUpperCase();
+      if (!sitesByName.has(key)) sitesByName.set(key, []);
+      sitesByName.get(key)!.push(a);
+    }
+
+    const results: SpillSite[] = [];
+    for (const [name, years] of sitesByName) {
+      // Prefer most recent year with spills > 0; fall back to most recent year
+      const withSpills = years
+        .filter((a) => ((a.Counted_spills_using_12_24h_cou as number) ?? 0) > 0)
+        .sort((a, b) => String(b.year ?? "").localeCompare(String(a.year ?? "")));
+      const best =
+        withSpills[0] ??
+        years.sort((a, b) => String(b.year ?? "").localeCompare(String(a.year ?? "")))[0];
+      if (!best || ((best.Counted_spills_using_12_24h_cou as number) ?? 0) === 0) continue;
+      results.push({
+        name,
+        spills: (best.Counted_spills_using_12_24h_cou as number) ?? 0,
+        hours: Math.round((best.Total_Duration__hrs__all_spills as number) ?? 0),
+        year: String(best.year ?? "").replace(/- | -/g, "").trim(),
+        company: (best.Water_Company_Name as string) ?? "",
+      });
+    }
+
+    return results.sort((a, b) => b.spills - a.spills).slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchMetaOnly(
+  rawPostcode: string
+): Promise<NextResponse<{ adminDistrict: string | null; supplier: string } | { error: string }>> {
+  const apiPcd = formatPostcodeForApi(rawPostcode);
+  const cleanPostcode = rawPostcode.replace(/\s+/g, "").toUpperCase();
+
+  let adminDistrict: string | null = null;
+
+  // Scottish postcodes: no postcodes.io, just return supplier
+  const SCOTTISH_PREFIXES = [
+    "EH", "G", "KY", "DD", "PH", "AB", "IV", "KW", "HS", "ZE",
+    "PA", "KA", "ML", "FK", "DG", "TD",
+  ];
+  if (SCOTTISH_PREFIXES.some((p) => cleanPostcode.startsWith(p))) {
+    return NextResponse.json({
+      adminDistrict: null,
+      supplier: "Scottish Water",
+    });
+  }
+
+  // NI postcodes
+  if (cleanPostcode.startsWith("BT")) {
+    try {
+      const geoRes = await fetch(
+        `https://api.postcodes.io/postcodes/${encodeURIComponent(apiPcd)}`
+      );
+      const geoJson = await geoRes.json();
+      if (geoJson?.result?.admin_district) {
+        adminDistrict = geoJson.result.admin_district;
+      }
+    } catch {
+      /* ignore */
+    }
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      return NextResponse.json({
+        adminDistrict,
+        supplier: "Northern Ireland Water",
+      });
+    }
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data: niZone } = await supabase
+      .from("ni_postcode_zones")
+      .select("zone_id")
+      .eq("postcode", cleanPostcode)
+      .maybeSingle();
+    if (niZone?.zone_id) {
+      const { data: zoneData } = await supabase
+        .from("water_zones")
+        .select("supplier")
+        .eq("zone_id", niZone.zone_id)
+        .maybeSingle();
+      return NextResponse.json({
+        adminDistrict,
+        supplier: zoneData?.supplier ?? "Northern Ireland Water",
+      });
+    }
+    return NextResponse.json({
+      adminDistrict,
+      supplier: "Northern Ireland Water",
+    });
+  }
+
+  // England/Wales: postcodes.io + water_zones (supplier only)
+  try {
+    const geoRes = await fetch(
+      `https://api.postcodes.io/postcodes/${encodeURIComponent(apiPcd)}`
+    );
+    const geoJson = await geoRes.json();
+    if (geoJson?.result) {
+      adminDistrict = geoJson.result.admin_district ?? null;
+      const lsoa = geoJson.result.codes?.lsoa ?? geoJson.result.codes?.lsoa21 ?? null;
+      if (lsoa && SUPABASE_URL && SUPABASE_ANON_KEY) {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const { data: zoneData } = await supabase
+          .from("water_zones")
+          .select("supplier")
+          .eq("zone_id", lsoa)
+          .maybeSingle();
+        return NextResponse.json({
+          adminDistrict,
+          supplier: zoneData?.supplier ?? "Your Area",
+        });
+      }
+      return NextResponse.json({
+        adminDistrict,
+        supplier: "Your Area",
+      });
+    }
+  } catch {
+    /* fall through */
+  }
+  return NextResponse.json({
+    adminDistrict,
+    supplier: "Your Area",
+  });
 }
 
 export async function GET(request: NextRequest) {
   const postcode = request.nextUrl.searchParams.get("postcode")?.trim();
+  const metaOnly = request.nextUrl.searchParams.get("metaOnly") === "true";
   if (!postcode) {
     return NextResponse.json(
       { error: "Missing postcode parameter" },
       { status: 400 }
     );
+  }
+  if (metaOnly) {
+    return fetchMetaOnly(postcode);
   }
   return fetchWaterData(postcode);
 }
@@ -69,7 +213,7 @@ async function fetchWaterData(
         zoneName: null,
         hasLocalSamples: false,
         chemicals: { nitrates: null, lead: null, chlorine: null, fluoride: null, hardness: null },
-        nearestSpill: null,
+        sewageSpills: [],
         source: "Water quality data",
         error: "Server misconfiguration: missing Supabase credentials",
       },
@@ -172,7 +316,7 @@ async function fetchWaterData(
           adminDistrict,
           hasLocalSamples: true,
           chemicals,
-          nearestSpill: null,
+          sewageSpills: [],
           source: `${zoneData?.supplier ?? "Northern Ireland Water"} 2024 Lab Results`,
         });
       }
@@ -190,7 +334,7 @@ async function fetchWaterData(
       zoneName: null,
       hasLocalSamples: false,
       chemicals: { nitrates: null, lead: null, chlorine: null, fluoride: null, hardness: null },
-      nearestSpill: null,
+      sewageSpills: [],
       source: "Scottish Water",
       comingSoon: true,
     });
@@ -350,38 +494,9 @@ async function fetchWaterData(
     source = "Regional baseline data";
   }
 
-  // 4. Sewage spill lookup
-  let nearestSpill: {
-    siteName: string;
-    countedSpills: number;
-    totalDurationHrs: number;
-  } | null = null;
-
-  if (lat != null && lng != null) {
-    const { data: spillsData } = await supabase.rpc("get_sewage_spills_near", {
-      p_lat: lat,
-      p_lng: lng,
-      p_radius_km: 80,
-    });
-    if (spillsData?.length) {
-      let minDist = Infinity;
-      let nearest: (typeof spillsData)[0] | null = null;
-      spillsData.forEach((s: { latitude: number; longitude: number }) => {
-        const d = haversineKm(lat!, lng!, s.latitude, s.longitude);
-        if (d < minDist) {
-          minDist = d;
-          nearest = s;
-        }
-      });
-      if (nearest) {
-        nearestSpill = {
-          siteName: nearest.site_name ?? "Nearest overflow",
-          countedSpills: nearest.counted_spills ?? 0,
-          totalDurationHrs: nearest.total_duration_hrs ?? 0,
-        };
-      }
-    }
-  }
+  // 4. Sewage spill lookup (EA EDM data, England/Wales only)
+  const sewageSpills =
+    lat != null && lng != null ? await getSewageSpills(lat, lng) : [];
 
   return NextResponse.json({
     supplier,
@@ -389,7 +504,7 @@ async function fetchWaterData(
     adminDistrict,
     hasLocalSamples,
     chemicals,
-    nearestSpill,
+    sewageSpills,
     source,
   });
 }

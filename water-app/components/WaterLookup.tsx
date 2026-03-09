@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { WaterScorecard } from "./WaterScorecard";
 import type { WaterScorecardData } from "./WaterScorecard";
@@ -21,7 +21,6 @@ type WaterLookupProps = {
 
 export function WaterLookup({ initialPostcode }: WaterLookupProps) {
   const router = useRouter();
-  const lastUrlPostcode = useRef<string | null>(null);
   const [postcode, setPostcode] = useState(initialPostcode ?? "");
   const [homeBuilt, setHomeBuilt] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,17 +44,24 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
 
   // Auto-search when landing with postcode in URL
   useEffect(() => {
-    if (!initialPostcode?.trim()) {
-      lastUrlPostcode.current = null;
+    if (initialPostcode) {
+      setPostcode(initialPostcode);
+      handleSearch(initialPostcode);
+    }
+  }, []);
+
+  function handleSearch(postcodeOverride?: string) {
+    const raw = (postcodeOverride ?? postcode).trim();
+    if (!raw) {
+      alert("Please enter a postcode or Eircode");
       return;
     }
-    const raw = initialPostcode.trim();
-    if (lastUrlPostcode.current === raw) return;
-    lastUrlPostcode.current = raw;
-    setPostcode(raw);
+    const formatted =
+      raw.length === 3 ? raw : raw.replace(/\s+/g, " ").trim().toUpperCase();
     setLoading(true);
     setError(null);
     setResult(null);
+    router.push(`/?postcode=${encodeURIComponent(formatted)}`);
     fetch(`/api/water?postcode=${encodeURIComponent(raw)}`)
       .then((res) => res.json())
       .then((data: WaterApiResponse) => {
@@ -69,21 +75,6 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
       })
       .catch(() => setError("Search failed. Please try again."))
       .finally(() => setLoading(false));
-  }, [initialPostcode]);
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    const raw = postcode.trim();
-    if (!raw) {
-      alert("Please enter a postcode or Eircode");
-      return;
-    }
-    const formatted =
-      raw.length === 3 ? raw : raw.replace(/\s+/g, " ").trim().toUpperCase();
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    router.push(`/?postcode=${encodeURIComponent(formatted)}`);
   }
 
   async function handleLeadSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -153,7 +144,10 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
           </p>
 
           <form
-            onSubmit={handleSearch}
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSearch();
+            }}
             className="mt-8 flex flex-col gap-4 sm:flex-row sm:gap-3"
           >
             <input
@@ -201,7 +195,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
           <div className="grid gap-8 sm:grid-cols-3">
             <div className="text-center">
               <p className="font-bold tabular-nums text-3xl text-[#0891b2] sm:text-4xl">
-                15
+                16
               </p>
               <p className="mt-1 text-sm font-medium text-[#0f2942]">
                 water companies covered

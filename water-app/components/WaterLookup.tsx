@@ -6,9 +6,14 @@ import { WaterScorecard } from "./WaterScorecard";
 import type { WaterScorecardData } from "./WaterScorecard";
 import type { WaterApiResponse } from "@/types/water";
 
-const MIN_STEP_MS = 800;
-const MIN_TOTAL_MS = 2500;
-const DONE_DISPLAY_MS = 600;
+const loadingSteps = [
+  "Looking up your postcode...",
+  "Finding your water supplier...",
+  "Fetching lab results...",
+  "Checking chemical levels...",
+  "Checking storm overflow records...",
+  "Building your water report...",
+];
 
 type WaterLookupProps = {
   initialPostcode?: string;
@@ -27,75 +32,50 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
   } | null>(null);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [leadSubmitted, setLeadSubmitted] = useState(false);
-  const [loadingStep, setLoadingStep] = useState<1 | 2 | 3 | "done">(1);
-  const [loadingData, setLoadingData] = useState<{
-    supplier: string;
-    adminDistrict: string | null;
-    sewageCount: number;
-  } | null>(null);
-  const pendingResultRef = useRef<{
-    data: WaterApiResponse;
-    searchValue: string;
-  } | null>(null);
-  const apiReturnedRef = useRef(false);
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentStepText, setCurrentStepText] = useState("");
 
-  // Step progression: min 800ms per step, min 2.5s total, 600ms after done
   useEffect(() => {
-    if (!loading) return;
-    setLoadingStep(1);
-    setLoadingData(null);
-    pendingResultRef.current = null;
-    apiReturnedRef.current = false;
-    const loadStart = Date.now();
+    if (!loading) {
+      setCompletedSteps([]);
+      setCurrentStepIndex(0);
+      setCurrentStepText("");
+      return;
+    }
+    setCompletedSteps([]);
+    setCurrentStepIndex(0);
+    setCurrentStepText("");
     let cancelled = false;
+    const CHAR_MS = 45;
+    const HOLD_MS = 600;
 
-    const advanceToStep2 = () => {
-      if (cancelled) return;
-      setLoadingStep(2);
-      const elapsed = Date.now() - loadStart;
-      const delay = Math.max(MIN_STEP_MS, MIN_TOTAL_MS / 3 - elapsed);
-      setTimeout(advanceToStep3, delay);
-    };
-    const advanceToStep3 = () => {
-      if (cancelled) return;
-      setLoadingStep(3);
-      const elapsed = Date.now() - loadStart;
-      const delay = Math.max(MIN_STEP_MS, (MIN_TOTAL_MS * 2) / 3 - elapsed);
-      setTimeout(() => {
+    const runStep = (stepIdx: number) => {
+      if (cancelled || stepIdx >= loadingSteps.length) return;
+      const full = loadingSteps[stepIdx];
+      let charIdx = 0;
+
+      const typeChar = () => {
         if (cancelled) return;
-        setLoadingStep("done");
-        const totalElapsed = Date.now() - loadStart;
-        const doneDelay = Math.max(DONE_DISPLAY_MS, MIN_TOTAL_MS - totalElapsed);
-        setTimeout(finishLoading, doneDelay);
-      }, delay);
-    };
-    const finishLoading = () => {
-      if (cancelled) return;
-      const pr = pendingResultRef.current;
-      if (pr) {
-        setResult(pr);
-        pendingResultRef.current = null;
-      }
-      setLoading(false);
-      setLoadingStep(1);
-      setLoadingData(null);
-      apiReturnedRef.current = false;
+        if (charIdx < full.length) {
+          setCurrentStepText(full.slice(0, charIdx + 1));
+          charIdx++;
+          setTimeout(typeChar, CHAR_MS);
+        } else {
+          setCompletedSteps((c) => [...c, full]);
+          setCurrentStepIndex(stepIdx + 1);
+          setCurrentStepText("");
+          if (stepIdx + 1 < loadingSteps.length) {
+            setTimeout(() => runStep(stepIdx + 1), HOLD_MS);
+          }
+        }
+      };
+      typeChar();
     };
 
-    const checkStep1 = () => {
-      if (cancelled) return;
-      const elapsed = Date.now() - loadStart;
-      const hasData = apiReturnedRef.current;
-      if (hasData && elapsed >= MIN_STEP_MS) {
-        advanceToStep2();
-      } else {
-        setTimeout(checkStep1, 50);
-      }
-    };
-    const id = setInterval(checkStep1, 50);
+    runStep(0);
     return () => {
       cancelled = true;
-      clearInterval(id);
     };
   }, [loading]);
 
@@ -130,22 +110,13 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
         if (!data.error) {
           const searchValue =
             raw.length === 3 ? raw : raw.replace(/\s+/g, " ").trim().toUpperCase();
-          pendingResultRef.current = { data, searchValue };
-          apiReturnedRef.current = true;
-          setLoadingData({
-            supplier: data.supplier ?? "Your area",
-            adminDistrict: data.adminDistrict ?? null,
-            sewageCount: data.sewageSpills?.length ?? 0,
-          });
+          setResult({ data, searchValue });
         } else {
           setError(data.error || "Search failed");
-          setLoading(false);
         }
       })
-      .catch(() => {
-        setError("Search failed. Please try again.");
-        setLoading(false);
-      });
+      .catch(() => setError("Search failed. Please try again."))
+      .finally(() => setLoading(false));
   }
 
   async function handleLeadSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -260,111 +231,22 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
         </div>
       </section>
 
-      {/* Loading panel — above hub cards, reserved height to prevent layout jump */}
-      <div ref={resultsRef} className={loading ? "min-h-[220px] sm:min-h-[240px]" : undefined}>
+      <div ref={resultsRef}>
       {loading && (
-        <section className="w-full bg-[#0f2942] px-4 py-10 sm:py-14">
-          <div className="mx-auto max-w-2xl">
-            {/* Step 1 */}
-            {(loadingStep === 1 || loadingStep === 2 || loadingStep === 3 || loadingStep === "done") && (
-              <div
-                className={`flex items-center gap-3 py-3 ${
-                  (loadingStep === 2 || loadingStep === 3 || loadingStep === "done") ? "opacity-100" : "animate-[fadeIn_0.3s_ease-in]"
-                }`}
-              >
-                <div className="relative h-8 w-8 shrink-0">
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ease-out ${
-                      (loadingStep === 2 || loadingStep === 3 || loadingStep === "done") ? "opacity-0" : "opacity-100"
-                    }`}
-                  >
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  </div>
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ease-out ${
-                      (loadingStep === 2 || loadingStep === 3 || loadingStep === "done") ? "opacity-100" : "opacity-0"
-                    }`}
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#22c55e] text-white text-sm font-bold">
-                      ✓
-                    </span>
-                  </div>
-                </div>
-                <span className="text-white">
-                  {(loadingStep === 2 || loadingStep === 3 || loadingStep === "done")
-                    ? `✓ Postcode found — ${loadingData?.supplier ?? "..."}${loadingData?.adminDistrict ? `, ${loadingData.adminDistrict}` : ""}`
-                    : "Finding your postcode..."}
-                </span>
+        <div className="mx-auto max-w-2xl px-4 pt-4 pb-6">
+          <div className="font-mono text-[12px] sm:text-[13px] text-left space-y-1">
+            {completedSteps.map((step, i) => (
+              <div key={i} className="text-[#64748b]">
+                {step}
               </div>
-            )}
-
-            {/* Step 2 */}
-            {(loadingStep === 2 || loadingStep === 3 || loadingStep === "done") && (
-              <div
-                className={`flex items-center gap-3 py-3 ${
-                  (loadingStep === 3 || loadingStep === "done") ? "opacity-100" : "animate-[fadeIn_0.3s_ease-in]"
-                }`}
-              >
-                <div className="relative h-8 w-8 shrink-0">
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ease-out ${
-                      (loadingStep === 3 || loadingStep === "done") ? "opacity-0" : "opacity-100"
-                    }`}
-                  >
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  </div>
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ease-out ${
-                      (loadingStep === 3 || loadingStep === "done") ? "opacity-100" : "opacity-0"
-                    }`}
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#22c55e] text-white text-sm font-bold">
-                      ✓
-                    </span>
-                  </div>
-                </div>
-                <span className="text-white">
-                  {(loadingStep === 3 || loadingStep === "done")
-                    ? "✓ Nitrates, chlorine, fluoride and lead loaded"
-                    : "Loading chemical readings..."}
-                </span>
-              </div>
-            )}
-
-            {/* Step 3 */}
-            {(loadingStep === 3 || loadingStep === "done") && (
-              <div
-                className={`flex items-center gap-3 py-3 ${
-                  loadingStep === "done" ? "opacity-100" : "animate-[fadeIn_0.3s_ease-in]"
-                }`}
-              >
-                <div className="relative h-8 w-8 shrink-0">
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ease-out ${
-                      loadingStep === "done" ? "opacity-0" : "opacity-100"
-                    }`}
-                  >
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  </div>
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ease-out ${
-                      loadingStep === "done" ? "opacity-100" : "opacity-0"
-                    }`}
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#22c55e] text-white text-sm font-bold">
-                      ✓
-                    </span>
-                  </div>
-                </div>
-                <span className="text-white">
-                  {loadingStep === "done"
-                    ? `✓ ${loadingData?.sewageCount ?? 0} overflow site${(loadingData?.sewageCount ?? 0) === 1 ? "" : "s"} found within 2km`
-                    : "Checking sewage spills nearby..."}
-                </span>
+            ))}
+            {currentStepText && (
+              <div className="text-[#94a3b8] animate-[fadeIn_0.2s_ease-out]">
+                {currentStepText}
               </div>
             )}
           </div>
-        </section>
+        </div>
       )}
 
       {/* Results */}
@@ -427,7 +309,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
       )}
       </div>
 
-      {/* Stats + audience entry points */}
+      {/* Stats + audience entry points — always visible below search */}
       <section className="border-t border-[#0f2942]/10 px-4 py-12 sm:py-16">
         <div className="mx-auto max-w-4xl">
           <div className="grid gap-8 sm:grid-cols-3">

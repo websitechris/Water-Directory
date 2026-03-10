@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { WaterScorecard } from "./WaterScorecard";
 import type { WaterScorecardData } from "./WaterScorecard";
@@ -21,6 +21,7 @@ type WaterLookupProps = {
 
 export function WaterLookup({ initialPostcode }: WaterLookupProps) {
   const router = useRouter();
+  const resultsRef = useRef<HTMLDivElement>(null);
   const [postcode, setPostcode] = useState(initialPostcode ?? "");
   const [homeBuilt, setHomeBuilt] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,6 +63,11 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
     setError(null);
     setResult(null);
     router.push(`/?postcode=${encodeURIComponent(formatted)}`);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
     fetch(`/api/water?postcode=${encodeURIComponent(raw)}`)
       .then((res) => res.json())
       .then((data: WaterApiResponse) => {
@@ -265,6 +271,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
         </div>
       </section>
 
+      <div ref={resultsRef}>
       {loading && (
         <section className="border-t border-[#0f2942]/10 bg-white px-4 py-10 sm:py-14">
           <div className="mx-auto max-w-2xl">
@@ -336,6 +343,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
           </div>
         </section>
       )}
+      </div>
 
       {/* Lead Modal */}
       {leadModalOpen && (

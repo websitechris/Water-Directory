@@ -36,6 +36,12 @@ export default function RootLayout({
             >
               Water Suppliers
             </Link>
+            <Link
+              href="/about"
+              className="text-[#1e293b] hover:text-[#0891b2]"
+            >
+              About
+            </Link>
           </nav>
         </header>
         {children}

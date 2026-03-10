@@ -6,15 +6,6 @@ import { WaterScorecard } from "./WaterScorecard";
 import type { WaterScorecardData } from "./WaterScorecard";
 import type { WaterApiResponse } from "@/types/water";
 
-const loadingSteps = [
-  "Looking up your postcode...",
-  "Finding your water supplier...",
-  "Fetching lab results...",
-  "Checking chemical levels...",
-  "Checking storm overflow records...",
-  "Building your water report...",
-];
-
 type WaterLookupProps = {
   initialPostcode?: string;
 };
@@ -32,52 +23,6 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
   } | null>(null);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [leadSubmitted, setLeadSubmitted] = useState(false);
-  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [currentStepText, setCurrentStepText] = useState("");
-
-  useEffect(() => {
-    if (!loading) {
-      setCompletedSteps([]);
-      setCurrentStepIndex(0);
-      setCurrentStepText("");
-      return;
-    }
-    setCompletedSteps([]);
-    setCurrentStepIndex(0);
-    setCurrentStepText("");
-    let cancelled = false;
-    const CHAR_MS = 45;
-    const HOLD_MS = 600;
-
-    const runStep = (stepIdx: number) => {
-      if (cancelled || stepIdx >= loadingSteps.length) return;
-      const full = loadingSteps[stepIdx];
-      let charIdx = 0;
-
-      const typeChar = () => {
-        if (cancelled) return;
-        if (charIdx < full.length) {
-          setCurrentStepText(full.slice(0, charIdx + 1));
-          charIdx++;
-          setTimeout(typeChar, CHAR_MS);
-        } else {
-          setCompletedSteps((c) => [...c, full]);
-          setCurrentStepIndex(stepIdx + 1);
-          setCurrentStepText("");
-          if (stepIdx + 1 < loadingSteps.length) {
-            setTimeout(() => runStep(stepIdx + 1), HOLD_MS);
-          }
-        }
-      };
-      typeChar();
-    };
-
-    runStep(0);
-    return () => {
-      cancelled = true;
-    };
-  }, [loading]);
 
   // Auto-search when landing with postcode in URL
   useEffect(() => {
@@ -233,19 +178,8 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
 
       <div ref={resultsRef}>
       {loading && (
-        <div className="mx-auto max-w-2xl px-4 pt-4 pb-6">
-          <div className="font-mono text-[12px] sm:text-[13px] text-left space-y-1">
-            {completedSteps.map((step, i) => (
-              <div key={i} className="text-[#64748b]">
-                {step}
-              </div>
-            ))}
-            {currentStepText && (
-              <div className="text-[#94a3b8] animate-[fadeIn_0.2s_ease-out]">
-                {currentStepText}
-              </div>
-            )}
-          </div>
+        <div className="h-[3px] w-full overflow-hidden bg-[#0f2942]">
+          <div className="h-full w-1/4 bg-[#0891b2] animate-[progressSweep_1.2s_ease-in-out_infinite" />
         </div>
       )}
 

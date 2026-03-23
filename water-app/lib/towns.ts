@@ -269,7 +269,7 @@ export const TOWNS: Town[] = [
     lng: -0.7524,
     county: "Buckinghamshire",
     postcode: "MK9 3EP",
-    live: false,
+    live: true,
   },
   {
     slug: "luton",
@@ -278,7 +278,7 @@ export const TOWNS: Town[] = [
     lng: -0.4586,
     county: "Bedfordshire",
     postcode: "LU1 2LT",
-    live: false,
+    live: true,
   },
   {
     slug: "reading",
@@ -287,7 +287,7 @@ export const TOWNS: Town[] = [
     lng: -0.9728,
     county: "Berkshire",
     postcode: "RG1 1DP",
-    live: false,
+    live: true,
   },
   {
     slug: "ipswich",
@@ -296,7 +296,7 @@ export const TOWNS: Town[] = [
     lng: 1.1525,
     county: "Suffolk",
     postcode: "IP1 1DH",
-    live: false,
+    live: true,
   },
   {
     slug: "norwich",
@@ -305,7 +305,7 @@ export const TOWNS: Town[] = [
     lng: 1.2988,
     county: "Norfolk",
     postcode: "NR1 1RB",
-    live: false,
+    live: true,
   },
   {
     slug: "colchester",
@@ -314,7 +314,7 @@ export const TOWNS: Town[] = [
     lng: 0.8989,
     county: "Essex",
     postcode: "CO1 1PJ",
-    live: false,
+    live: true,
   },
   {
     slug: "chelmsford",
@@ -323,7 +323,7 @@ export const TOWNS: Town[] = [
     lng: 0.4692,
     county: "Essex",
     postcode: "CM1 1HT",
-    live: false,
+    live: true,
   },
   {
     slug: "canterbury",
@@ -332,7 +332,7 @@ export const TOWNS: Town[] = [
     lng: 1.0796,
     county: "Kent",
     postcode: "CT1 2TG",
-    live: false,
+    live: true,
   },
   {
     slug: "maidstone",
@@ -341,7 +341,7 @@ export const TOWNS: Town[] = [
     lng: 0.5203,
     county: "Kent",
     postcode: "ME14 1HL",
-    live: false,
+    live: true,
   },
   {
     slug: "bournemouth",
@@ -350,7 +350,7 @@ export const TOWNS: Town[] = [
     lng: -1.8699,
     county: "Dorset",
     postcode: "BH1 1JU",
-    live: false,
+    live: true,
   },
   {
     slug: "blackpool",
@@ -368,7 +368,7 @@ export const TOWNS: Town[] = [
     lng: 0.285,
     county: "East Sussex",
     postcode: "BN21 3XZ",
-    live: false,
+    live: true,
   },
   {
     slug: "hastings",
@@ -377,7 +377,7 @@ export const TOWNS: Town[] = [
     lng: 0.5716,
     county: "East Sussex",
     postcode: "TN34 1BY",
-    live: false,
+    live: true,
   },
   {
     slug: "torquay",

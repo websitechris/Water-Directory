@@ -17,6 +17,7 @@ function normalizeRegion(s: string): string {
   return s
     .trim()
     .toLowerCase()
+    .replace(/\./g, "")
     .replace(/\s+/g, " ")
     .replace(/\s+county$/i, "");
 }
@@ -58,6 +59,14 @@ const HARD = new Set(
     "rutland",
     "city of bristol",
     "bristol, city of",
+    "west midlands",
+    "birmingham",
+    "coventry",
+    "dudley",
+    "sandwell",
+    "solihull",
+    "walsall",
+    "wolverhampton",
   ].map(normalizeRegion)
 );
 
@@ -68,6 +77,15 @@ const MODERATE = new Set(
     "herefordshire",
     "west yorkshire",
     "south yorkshire",
+    "leeds",
+    "bradford",
+    "wakefield",
+    "kirklees",
+    "calderdale",
+    "barnsley",
+    "doncaster",
+    "rotherham",
+    "sheffield",
   ].map(normalizeRegion)
 );
 
@@ -83,6 +101,22 @@ const SOFT = new Set(
     "county durham",
     "durham",
     "tyne and wear",
+    // postcodes.io often returns admin_district only (admin_county null) for metros
+    "manchester",
+    "salford",
+    "bolton",
+    "bury",
+    "oldham",
+    "rochdale",
+    "stockport",
+    "tameside",
+    "trafford",
+    "wigan",
+    "liverpool",
+    "knowsley",
+    "st helens",
+    "sefton",
+    "wirral",
   ].map(normalizeRegion)
 );
 
@@ -157,7 +191,7 @@ export function getEstimatedHardness(county: string | null | undefined): Hardnes
 
 /**
  * Use postcodes.io fields: Wales and Scotland → soft; London region → very hard;
- * then try admin_county, then admin_district.
+ * then admin_county, then admin_district (often the only field set for metropolitan areas).
  */
 export function getEstimatedHardnessFromGeo(
   ctx: HardnessGeoContext
@@ -172,10 +206,14 @@ export function getEstimatedHardnessFromGeo(
     return { category: "veryhard", mgPerLitre: MIDPOINTS.veryhard, isEstimate: true };
   }
 
-  const fromCounty = getEstimatedHardness(ctx.adminCounty);
+  const countyTrim = (ctx.adminCounty ?? "").trim();
+  const districtTrim = (ctx.adminDistrict ?? "").trim();
+
+  const fromCounty = countyTrim ? getEstimatedHardness(countyTrim) : null;
   if (fromCounty) return fromCounty;
 
-  const fromDistrict = getEstimatedHardness(ctx.adminDistrict);
+  // When admin_county is null (e.g. M1 1AA → district "Manchester"), district is the primary key
+  const fromDistrict = districtTrim ? getEstimatedHardness(districtTrim) : null;
   if (fromDistrict) return fromDistrict;
 
   return null;

@@ -252,7 +252,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
     ...chemicals.map(({ key, value, config }) => (
       <div
         key={key}
-        className="rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-3"
+        className="min-w-0 rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-3"
       >
         <p className="font-semibold text-sm text-[#0f2942]">{config.name}</p>
         <p className="mt-1 font-bold tabular-nums text-xl text-[#1e293b]">
@@ -265,7 +265,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
       ? [
           <div
             key="hardness"
-            className={`rounded-lg p-3 ${
+            className={`min-w-0 rounded-lg p-3 ${
               hardnessIsEstimate
                 ? "border-2 border-dashed border-[#d97706]/50 bg-amber-50/60"
                 : "border border-[#0f2942]/10 bg-[#f8fafc]"
@@ -292,7 +292,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
             )}
             <HardnessGaugeBar value={hardnessNum} />
             {hardnessIsEstimate && hardnessEstimate ? (
-              <p className="mt-2 text-xs leading-relaxed text-[#57534e]">
+              <p className="mt-2 line-clamp-3 text-[11px] leading-snug text-[#57534e]">
                 {getHardnessEstimateExplanation(
                   hardnessEstimate.regionLabel,
                   hardnessEstimate.category
@@ -364,7 +364,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
         </p>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+      <div className="mt-6 grid grid-cols-1 min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {allCards}
       </div>
 

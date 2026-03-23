@@ -41,3 +41,18 @@ body {
     transform: translateX(400%);
   }
 }
+
+/* House-age pills on loading panel — subtle attention pulse */
+@keyframes house-age-pills-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(8, 145, 178, 0);
+  }
+  50% {
+    box-shadow: 0 0 20px 4px rgba(8, 145, 178, 0.22);
+  }
+}
+
+.house-age-pills-glow {
+  animation: house-age-pills-glow 2.4s ease-in-out infinite;
+}

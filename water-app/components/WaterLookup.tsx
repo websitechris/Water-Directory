@@ -43,6 +43,11 @@ function step3CompleteLine(data: WaterApiResponse | undefined): string {
 /** Property age for lead-pipe context; only pre-1970 triggers the warning. */
 type HomeBuiltValue = "pre-1970" | "post-1970" | "not-sure";
 
+type PendingSuccessPayload = {
+  data: WaterApiResponse;
+  searchValue: string;
+};
+
 type StepPhase = "hidden" | "spin" | "done";
 
 type LoadingUi = {
@@ -104,11 +109,11 @@ const HOME_AGE_OPTIONS: { value: HomeBuiltValue; label: string }[] = [
 ];
 
 function LoadingPanelHouseAge({
-  homeBuilt,
-  onChange,
+  selectedValue,
+  onConfirm,
 }: {
-  homeBuilt: HomeBuiltValue;
-  onChange: (v: HomeBuiltValue) => void;
+  selectedValue: HomeBuiltValue | null;
+  onConfirm: (v: HomeBuiltValue) => void;
 }) {
   return (
     <div
@@ -116,22 +121,24 @@ function LoadingPanelHouseAge({
       role="group"
       aria-label="When was your home built?"
     >
-      <p className="text-sm font-medium text-white">When was your home built?</p>
-      <p className="mt-1 text-xs text-white/60">
-        Optional — we&apos;ll tailor your report. Loading continues either way.
+      <p className="text-base font-semibold text-white sm:text-lg">
+        When was your home built?
       </p>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <p className="mt-2 text-sm text-white/80">
+        Select an option to see your results
+      </p>
+      <div className="house-age-pills-glow mt-6 flex flex-wrap gap-3 rounded-xl border border-white/10 bg-white/5 p-4 sm:gap-4">
         {HOME_AGE_OPTIONS.map(({ value, label }) => {
-          const selected = homeBuilt === value;
+          const selected = selectedValue === value;
           return (
             <button
               key={value}
               type="button"
-              onClick={() => onChange(value)}
-              className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+              onClick={() => onConfirm(value)}
+              className={`rounded-full border-2 px-5 py-3 text-base font-semibold transition sm:px-6 sm:py-3.5 sm:text-lg ${
                 selected
-                  ? "border-[#0891b2] bg-[#0891b2] text-white"
-                  : "border-white/30 bg-transparent text-white hover:border-white/50 hover:bg-white/5"
+                  ? "border-[#0891b2] bg-[#0891b2] text-white shadow-md"
+                  : "border-white/30 bg-white/10 text-white hover:border-white/60 hover:bg-white/15"
               }`}
             >
               {label}
@@ -147,8 +154,9 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
   const router = useRouter();
   const resultsRef = useRef<HTMLDivElement>(null);
   const loadingPanelRef = useRef<HTMLDivElement>(null);
+  const pendingSuccessRef = useRef<PendingSuccessPayload | null>(null);
   const [postcode, setPostcode] = useState(initialPostcode ?? "");
-  const [homeBuilt, setHomeBuilt] = useState<HomeBuiltValue>("not-sure");
+  const [homeBuilt, setHomeBuilt] = useState<HomeBuiltValue | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingUi, setLoadingUi] = useState<LoadingUi | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -158,6 +166,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
   } | null>(null);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [leadSubmitted, setLeadSubmitted] = useState(false);
+  const [awaitingHouseSelection, setAwaitingHouseSelection] = useState(false);
 
   useEffect(() => {
     if (initialPostcode) {
@@ -181,7 +190,9 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
     setLoading(true);
     setError(null);
     setResult(null);
-    setHomeBuilt("not-sure");
+    setHomeBuilt(null);
+    setAwaitingHouseSelection(false);
+    pendingSuccessRef.current = null;
     setLoadingUi({
       fading: false,
       step1: { phase: "spin", line: "Looking up your postcode..." },
@@ -274,6 +285,21 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
 
       await sleep(Math.max(0, 1400 - (Date.now() - startTime)));
 
+      if (fetchError) {
+        setLoadingUi(null);
+        setLoading(false);
+        setAwaitingHouseSelection(false);
+        setError(fetchError);
+        return;
+      }
+      if (!finalData || finalData.error) {
+        setLoadingUi(null);
+        setLoading(false);
+        setAwaitingHouseSelection(false);
+        setError(finalData?.error || "Search failed. Please try again.");
+        return;
+      }
+
       setLoadingUi((prev) =>
         prev
           ? {
@@ -286,41 +312,44 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
           : prev
       );
 
-      const elapsed = Date.now() - startTime;
-      await sleep(Math.max(0, 1500 - elapsed));
-
-      setLoadingUi((prev) => (prev ? { ...prev, fading: true } : prev));
-      await sleep(300);
-
-      setLoadingUi(null);
-      setLoading(false);
-
-      if (fetchError) {
-        setError(fetchError);
-        return;
-      }
-      if (finalData?.error) {
-        setError(finalData.error || "Search failed");
-        return;
-      }
-      if (finalData) {
-        setResult({ data: finalData, searchValue });
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            resultsRef.current?.scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-            });
-          });
-        });
-      } else {
-        setError("Search failed. Please try again.");
-      }
+      pendingSuccessRef.current = {
+        data: finalData,
+        searchValue,
+      };
+      setAwaitingHouseSelection(true);
+      /* Pause until user picks a house-age option; see handleHouseAgeConfirm */
     } catch {
       setLoadingUi(null);
       setLoading(false);
+      setAwaitingHouseSelection(false);
+      pendingSuccessRef.current = null;
       setError("Search failed. Please try again.");
     }
+  }
+
+  function handleHouseAgeConfirm(value: HomeBuiltValue) {
+    const pending = pendingSuccessRef.current;
+    if (!pending) return;
+
+    pendingSuccessRef.current = null;
+    setAwaitingHouseSelection(false);
+    setHomeBuilt(value);
+
+    setLoadingUi((prev) => (prev ? { ...prev, fading: true } : prev));
+
+    window.setTimeout(() => {
+      setLoadingUi(null);
+      setLoading(false);
+      setResult({ data: pending.data, searchValue: pending.searchValue });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          resultsRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        });
+      });
+    }, 300);
   }
 
   function handleSearch(postcodeOverride?: string) {
@@ -411,9 +440,14 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
                 <StepRow phase={loadingUi.step2.phase} line={loadingUi.step2.line} />
                 <StepRow phase={loadingUi.step3.phase} line={loadingUi.step3.line} />
               </div>
-              {loadingUi.step2.phase === "done" && !loadingUi.fading && (
-                <LoadingPanelHouseAge homeBuilt={homeBuilt} onChange={setHomeBuilt} />
-              )}
+              {loadingUi.step3.phase === "done" &&
+                awaitingHouseSelection &&
+                !loadingUi.fading && (
+                  <LoadingPanelHouseAge
+                    selectedValue={homeBuilt}
+                    onConfirm={handleHouseAgeConfirm}
+                  />
+                )}
             </div>
           )}
 
@@ -681,7 +715,9 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
                     <select
                       name="property_age"
                       defaultValue={
-                        homeBuilt === "not-sure" ? "" : homeBuilt
+                        !homeBuilt || homeBuilt === "not-sure"
+                          ? ""
+                          : homeBuilt
                       }
                       className="mt-1 w-full rounded-lg border border-[#0f2942]/20 px-3 py-2 focus:border-[#0891b2] focus:outline-none"
                     >

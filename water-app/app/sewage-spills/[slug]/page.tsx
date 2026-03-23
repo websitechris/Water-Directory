@@ -143,7 +143,7 @@ export default async function SewageSpillsTownPage({ params }: PageProps) {
   const payload = await getTownSewage(slug);
   if (!payload) notFound();
 
-  const { town, sites, primaryYear, totalSpills, totalHours, siteCount } = payload;
+  const { town, sites, totalSpills, totalHours, siteCount } = payload;
   const subtitle = primaryWaterCompanyLine(sites);
   const equivalentDays =
     totalHours > 0 ? Math.round((totalHours / 24) * 10) / 10 : 0;
@@ -202,7 +202,7 @@ export default async function SewageSpillsTownPage({ params }: PageProps) {
           </div>
         </div>
         <p className="mt-8 border-t border-white/15 pt-5 text-center text-sm text-white/75 sm:text-left">
-          Based on the latest Environment Agency data ({primaryYear})
+          Based on the latest Environment Agency storm overflow data
         </p>
       </section>
 
@@ -271,7 +271,7 @@ export default async function SewageSpillsTownPage({ params }: PageProps) {
       {/* Cross-links */}
       <section className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2">
         <Link
-          href={`/?postcode=${encodeURIComponent(town.postcode)}`}
+          href={`/water-quality/${slug}`}
           className="flex gap-4 rounded-2xl border border-[#e2e8f0] bg-white p-6 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-shadow hover:shadow-md"
         >
           <BeakerIcon />
@@ -280,7 +280,7 @@ export default async function SewageSpillsTownPage({ params }: PageProps) {
               Check {town.name} tap water quality
             </p>
             <p className="mt-1 text-sm text-[#64748b]">
-              Nitrates, lead, chlorine and hardness for a representative postcode.
+              DWI lab-style readings, gauges and hardness for this area.
             </p>
           </div>
         </Link>

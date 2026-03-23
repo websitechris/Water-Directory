@@ -6,7 +6,7 @@ export type Town = {
   lat: number;
   lng: number;
   county: string;
-  /** Representative postcode for deep-linking to home lookup (temporary until /water-quality/[slug] exists). */
+  /** Representative postcode: postcodes.io → LSOA → Supabase zone/chemical lookup (town water pages + fallbacks). */
   postcode: string;
 };
 

@@ -7,6 +7,11 @@ import { getTownBySlug, TOWNS } from "@/lib/towns";
 import { getTownWaterData } from "@/lib/town-water";
 import type { TownWaterChemicals } from "@/lib/town-water";
 import {
+  getEstimatedHardness,
+  getHardnessEstimateExplanation,
+  hardnessEstimateCategoryLabel,
+} from "@/lib/hardness-estimate";
+import {
   formatChemDisplay,
   getHardnessCategory,
   hardnessLabel,
@@ -205,6 +210,8 @@ export default async function TownWaterQualityPage({ params }: PageProps) {
   const { nitrateWarn, leadWarn, allSafeTeal } = healthContext(chemicals);
   const hardnessNum = chemicals.hardness;
   const hardnessCat = hardnessNum != null ? getHardnessCategory(hardnessNum) : null;
+  const hardnessGeoEstimate =
+    hardnessNum == null ? getEstimatedHardness(town.county) : null;
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
@@ -287,7 +294,7 @@ export default async function TownWaterQualityPage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* Hardness card */}
+      {/* Hardness — lab-tested */}
       {hardnessNum != null && hardnessCat != null && (
         <section className="mt-8 rounded-2xl border border-[#e2e8f0] border-l-4 border-l-[#d97706] bg-white p-5 shadow-sm md:p-6">
           <h2 className="text-base font-semibold text-[#0f2942]">Water hardness</h2>
@@ -302,6 +309,34 @@ export default async function TownWaterQualityPage({ params }: PageProps) {
             <p className="mt-3 text-sm leading-relaxed text-[#475569]">
               Your area has hard water. This can affect skin conditions and cause
               limescale buildup.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* Hardness — geology-based estimate when no lab CaCO₃ in database */}
+      {hardnessNum == null && hardnessGeoEstimate != null && (
+        <section
+          className="mt-8 rounded-2xl border-2 border-dashed border-[#d97706]/55 bg-amber-50/50 p-5 shadow-sm md:p-6"
+          aria-label="Estimated water hardness"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-[#0f2942]">Water hardness</h2>
+            <span className="rounded-full bg-amber-200/90 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-[#92400e]">
+              Estimated
+            </span>
+          </div>
+          <p className="mt-2 text-lg font-semibold text-[#1e293b] md:text-xl">
+            Estimated: {hardnessEstimateCategoryLabel(hardnessGeoEstimate.category)} (~
+            {hardnessGeoEstimate.mgPerLitre} mg/L CaCO₃)
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-[#475569]">
+            {getHardnessEstimateExplanation(town.county, hardnessGeoEstimate.category)}
+          </p>
+          {hardnessGeoEstimate.mgPerLitre > 200 && (
+            <p className="mt-3 text-sm leading-relaxed text-[#475569]">
+              Your area is likely to have hard water. This can affect skin conditions and
+              cause limescale buildup.
             </p>
           )}
         </section>

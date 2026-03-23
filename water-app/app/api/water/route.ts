@@ -171,6 +171,9 @@ async function fetchWaterData(
       {
         supplier: "Your Area",
         zoneName: null,
+        adminCounty: null,
+        country: null,
+        region: null,
         hasLocalSamples: false,
         chemicals: { nitrates: null, lead: null, chlorine: null, fluoride: null, hardness: null },
         sewageSpills: [],
@@ -191,6 +194,9 @@ async function fetchWaterData(
   let lng: number | null = null;
 
   let adminDistrict: string | null = null;
+  let adminCounty: string | null = null;
+  let country: string | null = null;
+  let region: string | null = null;
 
   // 0. NI postcode: lookup via ni_postcode_zones
   if (cleanPostcode.startsWith("BT")) {
@@ -200,8 +206,11 @@ async function fetchWaterData(
         `https://api.postcodes.io/postcodes/${encodeURIComponent(apiPcd)}`
       );
       const geoJson = await geoRes.json();
-      if (geoJson?.result?.admin_district) {
-        adminDistrict = geoJson.result.admin_district;
+      if (geoJson?.result) {
+        adminDistrict = geoJson.result.admin_district ?? null;
+        adminCounty = geoJson.result.admin_county ?? null;
+        country = geoJson.result.country ?? null;
+        region = geoJson.result.region ?? null;
       }
     } catch {
       /* ignore */
@@ -274,6 +283,9 @@ async function fetchWaterData(
           supplier: zoneData?.supplier ?? "Northern Ireland Water",
           zoneName: zoneData?.zone_name ?? null,
           adminDistrict,
+          adminCounty,
+          country,
+          region,
           hasLocalSamples: true,
           chemicals,
           sewageSpills: [],
@@ -292,6 +304,9 @@ async function fetchWaterData(
     return NextResponse.json({
       supplier: "Scottish Water",
       zoneName: null,
+      adminCounty: null,
+      country: null,
+      region: null,
       hasLocalSamples: false,
       chemicals: { nitrates: null, lead: null, chlorine: null, fluoride: null, hardness: null },
       sewageSpills: [],
@@ -312,6 +327,9 @@ async function fetchWaterData(
       lat = geoJson.result.latitude;
       lng = geoJson.result.longitude;
       adminDistrict = geoJson.result.admin_district ?? null;
+      adminCounty = geoJson.result.admin_county ?? null;
+      country = geoJson.result.country ?? null;
+      region = geoJson.result.region ?? null;
     }
   } catch (e) {
     console.warn("Postcodes.io failed:", e);
@@ -462,6 +480,9 @@ async function fetchWaterData(
     supplier,
     zoneName,
     adminDistrict,
+    adminCounty,
+    country,
+    region,
     hasLocalSamples,
     chemicals,
     sewageSpills,

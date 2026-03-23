@@ -1,11 +1,22 @@
 "use client";
 
+import type { HardnessEstimateCategory } from "@/lib/hardness-estimate";
+import {
+  getHardnessEstimateExplanation,
+  hardnessEstimateCategoryLabel,
+} from "@/lib/hardness-estimate";
+
 export type WaterScorecardData = {
   nitrates: number | string | null;
   lead: number | string | null;
   chlorine: number | string | null;
   fluoride: number | string | null;
   hardness: number | null;
+  /** Set when hardness is a geology-based fallback (not lab CaCO₃). */
+  hardnessEstimate?: {
+    regionLabel: string;
+    category: HardnessEstimateCategory;
+  } | null;
   hasLocalSamples: boolean;
   supplier: string;
   zoneName: string | null;
@@ -206,6 +217,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
     chlorine,
     fluoride,
     hardness,
+    hardnessEstimate,
     hasLocalSamples,
     supplier,
   } = data;
@@ -223,6 +235,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
   ];
 
   const hardnessNum = hardness != null && !isNaN(hardness) ? hardness : null;
+  const hardnessIsEstimate = Boolean(hardnessEstimate && hardnessNum !== null);
 
   const chemicalsNeedAttention = chemicals.some(({ value, config }) => {
     const num = parseVal(value);
@@ -252,14 +265,40 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
       ? [
           <div
             key="hardness"
-            className="rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-3"
+            className={`rounded-lg p-3 ${
+              hardnessIsEstimate
+                ? "border-2 border-dashed border-[#d97706]/50 bg-amber-50/60"
+                : "border border-[#0f2942]/10 bg-[#f8fafc]"
+            }`}
           >
-            <p className="font-semibold text-sm text-[#0f2942]">Hardness</p>
-            <p className="mt-1 font-bold tabular-nums text-xl text-[#1e293b]">
-              {hardnessNum.toFixed(0)}{" "}
-              <span className="text-sm font-normal text-[#64748b]">mg/L CaCO₃</span>
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-semibold text-sm text-[#0f2942]">Hardness</p>
+              {hardnessIsEstimate ? (
+                <span className="rounded-full bg-amber-200/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#92400e]">
+                  Estimated
+                </span>
+              ) : null}
+            </div>
+            {hardnessIsEstimate && hardnessEstimate ? (
+              <p className="mt-1 text-base font-semibold text-[#78350f]">
+                Estimated: {hardnessEstimateCategoryLabel(hardnessEstimate.category)} (~
+                {hardnessNum.toFixed(0)} mg/L CaCO₃)
+              </p>
+            ) : (
+              <p className="mt-1 font-bold tabular-nums text-xl text-[#1e293b]">
+                {hardnessNum.toFixed(0)}{" "}
+                <span className="text-sm font-normal text-[#64748b]">mg/L CaCO₃</span>
+              </p>
+            )}
             <HardnessGaugeBar value={hardnessNum} />
+            {hardnessIsEstimate && hardnessEstimate ? (
+              <p className="mt-2 text-xs leading-relaxed text-[#57534e]">
+                {getHardnessEstimateExplanation(
+                  hardnessEstimate.regionLabel,
+                  hardnessEstimate.category
+                )}
+              </p>
+            ) : null}
             {hardnessNum > 200 && (
               <a
                 href="https://www.harveywatersofteners.co.uk"

@@ -11,6 +11,10 @@ export type WaterApiResponse = {
   zoneName: string | null;
   /** Town/city from postcodes.io (admin_district) when available; null for Scottish/NI when not looked up */
   adminDistrict?: string | null;
+  /** Ceremonial county from postcodes.io — used for geology-based hardness fallback */
+  adminCounty?: string | null;
+  country?: string | null;
+  region?: string | null;
   hasLocalSamples: boolean;
   comingSoon?: boolean;
   chemicals: {

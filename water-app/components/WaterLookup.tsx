@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { WaterScorecard } from "./WaterScorecard";
 import type { WaterScorecardData } from "./WaterScorecard";
+import {
+  displayRegionName,
+  getEstimatedHardnessFromGeo,
+} from "@/lib/hardness-estimate";
 import type { WaterApiResponse } from "@/types/water";
 
 type WaterLookupProps = {
@@ -395,19 +399,36 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
   const familyWarning = nitratesNum > 25 || leadNum > 10;
 
   const scorecardData: WaterScorecardData | null = result
-    ? {
-        nitrates: result.data.chemicals.nitrates,
-        lead: result.data.chemicals.lead,
-        chlorine: result.data.chemicals.chlorine,
-        fluoride: result.data.chemicals.fluoride,
-        hardness: result.data.chemicals.hardness ?? null,
-        hasLocalSamples: result.data.hasLocalSamples,
-        supplier: result.data.supplier,
-        zoneName: result.data.zoneName,
-        propertyValueImpact: hasLeadRisk ? "high" : "low",
-        familyHealthScore: familyWarning ? "review" : "good",
-        sewageSpills: result.data.sewageSpills,
-      }
+    ? (() => {
+        const geoForHardness = {
+          adminCounty: result.data.adminCounty ?? null,
+          adminDistrict: result.data.adminDistrict ?? null,
+          country: result.data.country ?? null,
+          region: result.data.region ?? null,
+        };
+        const hardnessEst =
+          result.data.chemicals.hardness == null
+            ? getEstimatedHardnessFromGeo(geoForHardness)
+            : null;
+        const regionLabel = displayRegionName(geoForHardness);
+        return {
+          nitrates: result.data.chemicals.nitrates,
+          lead: result.data.chemicals.lead,
+          chlorine: result.data.chemicals.chlorine,
+          fluoride: result.data.chemicals.fluoride,
+          hardness:
+            result.data.chemicals.hardness ?? hardnessEst?.mgPerLitre ?? null,
+          hardnessEstimate: hardnessEst
+            ? { regionLabel, category: hardnessEst.category }
+            : null,
+          hasLocalSamples: result.data.hasLocalSamples,
+          supplier: result.data.supplier,
+          zoneName: result.data.zoneName,
+          propertyValueImpact: hasLeadRisk ? "high" : "low",
+          familyHealthScore: familyWarning ? "review" : "good",
+          sewageSpills: result.data.sewageSpills,
+        };
+      })()
     : null;
 
   const showHeroForm = !loading;

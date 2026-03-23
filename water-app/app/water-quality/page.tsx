@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getTownsSortedAlphabetically } from "@/lib/towns";
+import { getTownsLive } from "@/lib/towns";
 
 const cardClass =
   "group block rounded-2xl border border-[#e2e8f0] border-l-4 border-l-transparent bg-white p-6 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-all hover:border-l-[#0891b2] hover:shadow-md";
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 };
 
 export default function WaterQualityHubPage() {
-  const towns = getTownsSortedAlphabetically();
+  const towns = getTownsLive();
 
   return (
     <main className="min-h-screen bg-[#f8fafc] px-4 pb-16 pt-8">

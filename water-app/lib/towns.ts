@@ -1,5 +1,10 @@
 /** Town centres for sewage spill radius pages (WGS84). */
 
+/**
+ * Hub listing visibility for /water-quality and /sewage-spills.
+ * All towns in the catalogue should set `live` explicitly: use `true` when linked from hubs,
+ * `false` for drip-feed (pages still pre-render via generateStaticParams).
+ */
 export type Town = {
   slug: string;
   name: string;
@@ -8,6 +13,7 @@ export type Town = {
   county: string;
   /** Representative postcode: postcodes.io → LSOA → Supabase zone/chemical lookup (town water pages + fallbacks). */
   postcode: string;
+  live: boolean;
 };
 
 export const TOWNS: Town[] = [
@@ -18,6 +24,7 @@ export const TOWNS: Town[] = [
     lng: -1.0803,
     county: "North Yorkshire",
     postcode: "YO1 7EN",
+    live: true,
   },
   {
     slug: "medway",
@@ -26,6 +33,7 @@ export const TOWNS: Town[] = [
     lng: 0.5062,
     county: "Kent",
     postcode: "ME4 4EP",
+    live: true,
   },
   {
     slug: "plymouth",
@@ -34,6 +42,7 @@ export const TOWNS: Town[] = [
     lng: -4.1427,
     county: "Devon",
     postcode: "PL1 2AB",
+    live: true,
   },
   {
     slug: "newcastle",
@@ -42,6 +51,7 @@ export const TOWNS: Town[] = [
     lng: -1.6178,
     county: "Tyne and Wear",
     postcode: "NE1 4ST",
+    live: true,
   },
   {
     slug: "bath",
@@ -50,6 +60,7 @@ export const TOWNS: Town[] = [
     lng: -2.3599,
     county: "Somerset",
     postcode: "BA1 1LZ",
+    live: true,
   },
   {
     slug: "oxford",
@@ -58,6 +69,7 @@ export const TOWNS: Town[] = [
     lng: -1.2577,
     county: "Oxfordshire",
     postcode: "OX1 1ND",
+    live: true,
   },
   {
     slug: "brighton",
@@ -66,6 +78,7 @@ export const TOWNS: Town[] = [
     lng: -0.1372,
     county: "East Sussex",
     postcode: "BN1 1AL",
+    live: true,
   },
   {
     slug: "bristol",
@@ -74,6 +87,7 @@ export const TOWNS: Town[] = [
     lng: -2.5879,
     county: "City of Bristol",
     postcode: "BS1 5TR",
+    live: true,
   },
   {
     slug: "manchester",
@@ -82,6 +96,7 @@ export const TOWNS: Town[] = [
     lng: -2.2426,
     county: "Greater Manchester",
     postcode: "M2 5WQ",
+    live: true,
   },
   {
     slug: "southampton",
@@ -90,6 +105,7 @@ export const TOWNS: Town[] = [
     lng: -1.4044,
     county: "Hampshire",
     postcode: "SO14 3TJ",
+    live: true,
   },
   {
     slug: "worthing",
@@ -98,6 +114,7 @@ export const TOWNS: Town[] = [
     lng: -0.3727,
     county: "West Sussex",
     postcode: "BN11 1NJ",
+    live: true,
   },
   {
     slug: "leeds",
@@ -106,6 +123,7 @@ export const TOWNS: Town[] = [
     lng: -1.5491,
     county: "West Yorkshire",
     postcode: "LS1 4DY",
+    live: true,
   },
   {
     slug: "sheffield",
@@ -114,6 +132,7 @@ export const TOWNS: Town[] = [
     lng: -1.4701,
     county: "South Yorkshire",
     postcode: "S1 2HE",
+    live: true,
   },
   {
     slug: "nottingham",
@@ -122,6 +141,7 @@ export const TOWNS: Town[] = [
     lng: -1.1581,
     county: "Nottinghamshire",
     postcode: "NG1 2BY",
+    live: true,
   },
   {
     slug: "cambridge",
@@ -130,6 +150,333 @@ export const TOWNS: Town[] = [
     lng: 0.1192,
     county: "Cambridgeshire",
     postcode: "CB2 1TJ",
+    live: true,
+  },
+
+  /* ── Drip-feed towns (`live: false`) — postcodes verified postcodes.io 200 ── */
+  {
+    slug: "london",
+    name: "London",
+    lat: 51.501,
+    lng: -0.1416,
+    county: "Greater London",
+    postcode: "SW1A 1AA",
+    live: false,
+  },
+  {
+    slug: "birmingham",
+    name: "Birmingham",
+    lat: 52.4768,
+    lng: -1.9062,
+    county: "West Midlands",
+    postcode: "B1 1TB",
+    live: false,
+  },
+  {
+    slug: "liverpool",
+    name: "Liverpool",
+    lat: 53.4046,
+    lng: -2.9872,
+    county: "Merseyside",
+    postcode: "L1 8JQ",
+    live: false,
+  },
+  {
+    slug: "edinburgh",
+    name: "Edinburgh",
+    lat: 55.9503,
+    lng: -3.193,
+    county: "City of Edinburgh",
+    postcode: "EH1 1YZ",
+    live: false,
+  },
+  {
+    slug: "glasgow",
+    name: "Glasgow",
+    lat: 55.8612,
+    lng: -4.2447,
+    county: "Glasgow City",
+    postcode: "G1 1XQ",
+    live: false,
+  },
+  {
+    slug: "cardiff",
+    name: "Cardiff",
+    lat: 51.4758,
+    lng: -3.1792,
+    county: "South Glamorgan",
+    postcode: "CF10 1EP",
+    live: false,
+  },
+  {
+    slug: "belfast",
+    name: "Belfast",
+    lat: 54.5966,
+    lng: -5.9301,
+    county: "County Antrim",
+    postcode: "BT1 5GS",
+    live: false,
+  },
+  {
+    slug: "whitby",
+    name: "Whitby",
+    lat: 54.4885,
+    lng: -0.612,
+    county: "North Yorkshire",
+    postcode: "YO22 4DE",
+    live: false,
+  },
+  {
+    slug: "scarborough",
+    name: "Scarborough",
+    lat: 54.2835,
+    lng: -0.4059,
+    county: "North Yorkshire",
+    postcode: "YO11 1XN",
+    live: false,
+  },
+  {
+    slug: "exeter",
+    name: "Exeter",
+    lat: 50.724,
+    lng: -3.5246,
+    county: "Devon",
+    postcode: "EX1 1QA",
+    live: false,
+  },
+  {
+    slug: "sidmouth",
+    name: "Sidmouth",
+    lat: 50.6784,
+    lng: -3.2383,
+    county: "Devon",
+    postcode: "EX10 8AR",
+    live: false,
+  },
+  {
+    slug: "taunton",
+    name: "Taunton",
+    lat: 51.0234,
+    lng: -3.1097,
+    county: "Somerset",
+    postcode: "TA1 1AA",
+    live: false,
+  },
+  {
+    slug: "milton-keynes",
+    name: "Milton Keynes",
+    lat: 52.0449,
+    lng: -0.7524,
+    county: "Buckinghamshire",
+    postcode: "MK9 3EP",
+    live: false,
+  },
+  {
+    slug: "luton",
+    name: "Luton",
+    lat: 51.9053,
+    lng: -0.4586,
+    county: "Bedfordshire",
+    postcode: "LU1 2LT",
+    live: false,
+  },
+  {
+    slug: "reading",
+    name: "Reading",
+    lat: 51.457,
+    lng: -0.9728,
+    county: "Berkshire",
+    postcode: "RG1 1DP",
+    live: false,
+  },
+  {
+    slug: "ipswich",
+    name: "Ipswich",
+    lat: 52.0577,
+    lng: 1.1525,
+    county: "Suffolk",
+    postcode: "IP1 1DH",
+    live: false,
+  },
+  {
+    slug: "norwich",
+    name: "Norwich",
+    lat: 52.6263,
+    lng: 1.2988,
+    county: "Norfolk",
+    postcode: "NR1 1RB",
+    live: false,
+  },
+  {
+    slug: "colchester",
+    name: "Colchester",
+    lat: 51.8898,
+    lng: 0.8989,
+    county: "Essex",
+    postcode: "CO1 1PJ",
+    live: false,
+  },
+  {
+    slug: "chelmsford",
+    name: "Chelmsford",
+    lat: 51.7362,
+    lng: 0.4692,
+    county: "Essex",
+    postcode: "CM1 1HT",
+    live: false,
+  },
+  {
+    slug: "canterbury",
+    name: "Canterbury",
+    lat: 51.2781,
+    lng: 1.0796,
+    county: "Kent",
+    postcode: "CT1 2TG",
+    live: false,
+  },
+  {
+    slug: "maidstone",
+    name: "Maidstone",
+    lat: 51.2733,
+    lng: 0.5203,
+    county: "Kent",
+    postcode: "ME14 1HL",
+    live: false,
+  },
+  {
+    slug: "bournemouth",
+    name: "Bournemouth",
+    lat: 50.7224,
+    lng: -1.8699,
+    county: "Dorset",
+    postcode: "BH1 1JU",
+    live: false,
+  },
+  {
+    slug: "blackpool",
+    name: "Blackpool",
+    lat: 53.8205,
+    lng: -3.0519,
+    county: "Lancashire",
+    postcode: "FY1 1PU",
+    live: false,
+  },
+  {
+    slug: "eastbourne",
+    name: "Eastbourne",
+    lat: 50.7722,
+    lng: 0.285,
+    county: "East Sussex",
+    postcode: "BN21 3XZ",
+    live: false,
+  },
+  {
+    slug: "hastings",
+    name: "Hastings",
+    lat: 50.8631,
+    lng: 0.5716,
+    county: "East Sussex",
+    postcode: "TN34 1BY",
+    live: false,
+  },
+  {
+    slug: "torquay",
+    name: "Torquay",
+    lat: 50.458,
+    lng: -3.525,
+    county: "Devon",
+    postcode: "TQ1 2BG",
+    live: false,
+  },
+  {
+    slug: "leicester",
+    name: "Leicester",
+    lat: 52.6268,
+    lng: -1.136,
+    county: "Leicestershire",
+    postcode: "LE1 5WW",
+    live: false,
+  },
+  {
+    slug: "coventry",
+    name: "Coventry",
+    lat: 52.4097,
+    lng: -1.5096,
+    county: "West Midlands",
+    postcode: "CV1 1FJ",
+    live: false,
+  },
+  {
+    slug: "derby",
+    name: "Derby",
+    lat: 52.9245,
+    lng: -1.4752,
+    county: "Derbyshire",
+    postcode: "DE1 3AF",
+    live: false,
+  },
+  {
+    slug: "stoke-on-trent",
+    name: "Stoke-on-Trent",
+    lat: 53.0249,
+    lng: -2.1745,
+    county: "Staffordshire",
+    postcode: "ST1 1LX",
+    live: false,
+  },
+  {
+    slug: "sunderland",
+    name: "Sunderland",
+    lat: 54.9079,
+    lng: -1.379,
+    county: "Tyne and Wear",
+    postcode: "SR1 1TP",
+    live: false,
+  },
+  {
+    slug: "wolverhampton",
+    name: "Wolverhampton",
+    lat: 52.5871,
+    lng: -2.1296,
+    county: "West Midlands",
+    postcode: "WV1 1SH",
+    live: false,
+  },
+  {
+    slug: "gloucester",
+    name: "Gloucester",
+    lat: 51.8643,
+    lng: -2.2459,
+    county: "Gloucestershire",
+    postcode: "GL1 1AG",
+    live: false,
+  },
+  {
+    slug: "chester",
+    name: "Chester",
+    lat: 53.1912,
+    lng: -2.8855,
+    county: "Cheshire",
+    postcode: "CH1 1HT",
+    live: false,
+  },
+  {
+    slug: "lincoln",
+    name: "Lincoln",
+    lat: 53.2324,
+    lng: -0.5438,
+    county: "Lincolnshire",
+    postcode: "LN1 1HU",
+    live: false,
+  },
+  {
+    slug: "peterborough",
+    name: "Peterborough",
+    lat: 52.5819,
+    lng: -0.2062,
+    county: "Cambridgeshire",
+    postcode: "PE1 5YD",
+    live: false,
   },
 ];
 
@@ -137,7 +484,14 @@ export function getTownBySlug(slug: string): Town | undefined {
   return TOWNS.find((t) => t.slug === slug);
 }
 
-/** Alphabetical by display name — for hub listing pages. */
+/** Towns visible on hub pages (`live: true`), A–Z by display name. */
+export function getTownsLive(): Town[] {
+  return TOWNS.filter((t) => t.live).sort((a, b) =>
+    a.name.localeCompare(b.name, "en-GB")
+  );
+}
+
+/** Alphabetical by display name — all towns in `TOWNS` (including `live: false`). */
 export function getTownsSortedAlphabetically(): Town[] {
   return [...TOWNS].sort((a, b) => a.name.localeCompare(b.name, "en-GB"));
 }

@@ -11,12 +11,97 @@ type WaterLookupProps = {
   initialPostcode?: string;
 };
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function cleanSupplier(s: string): string {
+  return s.replace(/\(.*$/, "").trim();
+}
+
+function step1CompleteLine(data: WaterApiResponse | undefined): string {
+  if (!data) return "Postcode verified";
+  const sup = cleanSupplier(data.supplier || "Your supplier");
+  const town =
+    data.adminDistrict?.trim() ||
+    data.zoneName?.trim() ||
+    "your area";
+  return `Postcode found — ${sup}, ${town}`;
+}
+
+function step3CompleteLine(data: WaterApiResponse | undefined): string {
+  if (!data) return "Lookup finished";
+  const sites = data.sewageSpills ?? [];
+  const withSpills = sites.filter((s) => s.spills > 0);
+  const n = withSpills.length;
+  if (n === 0) {
+    return "No overflow sites with recorded spills within 2km";
+  }
+  return `${n} overflow site${n === 1 ? "" : "s"} found within 2km`;
+}
+
+type StepPhase = "hidden" | "spin" | "done";
+
+type LoadingUi = {
+  fading: boolean;
+  step1: { phase: StepPhase; line: string };
+  step2: { phase: StepPhase; line: string };
+  step3: { phase: StepPhase; line: string };
+};
+
+function StepRow({
+  phase,
+  line,
+}: {
+  phase: StepPhase;
+  line: string;
+}) {
+  if (phase === "hidden") return null;
+  const done = phase === "done";
+  return (
+    <div className="flex items-start gap-3 py-2">
+      <div className="relative mt-0.5 h-5 w-5 shrink-0">
+        <div
+          className={`absolute inset-0 flex items-center justify-center transition-opacity duration-150 ${
+            done ? "opacity-0" : "opacity-100"
+          }`}
+          aria-hidden
+        >
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/25 border-t-white" />
+        </div>
+        <div
+          className={`absolute inset-0 flex items-center justify-center transition-opacity duration-150 ${
+            done ? "opacity-100" : "opacity-0"
+          }`}
+          aria-hidden
+        >
+          <svg
+            className="h-5 w-5 text-[#16a34a]"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path
+              fillRule="evenodd"
+              d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </div>
+      </div>
+      <p className="text-sm leading-snug text-white/95 sm:text-base">{line}</p>
+    </div>
+  );
+}
+
 export function WaterLookup({ initialPostcode }: WaterLookupProps) {
   const router = useRouter();
   const resultsRef = useRef<HTMLDivElement>(null);
+  const loadingPanelRef = useRef<HTMLDivElement>(null);
   const [postcode, setPostcode] = useState(initialPostcode ?? "");
   const [homeBuilt, setHomeBuilt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingUi, setLoadingUi] = useState<LoadingUi | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
     data: WaterApiResponse;
@@ -25,15 +110,15 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [leadSubmitted, setLeadSubmitted] = useState(false);
 
-  // Auto-search when landing with postcode in URL
   useEffect(() => {
     if (initialPostcode) {
       setPostcode(initialPostcode);
-      handleSearch(initialPostcode);
+      void runSearch(initialPostcode);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot initial URL search
   }, []);
 
-  function handleSearch(postcodeOverride?: string) {
+  async function runSearch(postcodeOverride?: string) {
     const raw = (postcodeOverride ?? postcode).trim();
     if (!raw) {
       alert("Please enter a postcode or Eircode");
@@ -41,28 +126,155 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
     }
     const formatted =
       raw.length === 3 ? raw : raw.replace(/\s+/g, " ").trim().toUpperCase();
+    const searchValue =
+      raw.length === 3 ? raw : raw.replace(/\s+/g, " ").trim().toUpperCase();
+
     setLoading(true);
     setError(null);
     setResult(null);
+    setLoadingUi({
+      fading: false,
+      step1: { phase: "spin", line: "Looking up your postcode..." },
+      step2: { phase: "hidden", line: "" },
+      step3: { phase: "hidden", line: "" },
+    });
+
     router.push(`/?postcode=${encodeURIComponent(formatted)}`);
+
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        loadingPanelRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
       });
     });
-    fetch(`/api/water?postcode=${encodeURIComponent(raw)}`)
-      .then((res) => res.json())
-      .then((data: WaterApiResponse) => {
-        if (!data.error) {
-          const searchValue =
-            raw.length === 3 ? raw : raw.replace(/\s+/g, " ").trim().toUpperCase();
-          setResult({ data, searchValue });
-        } else {
-          setError(data.error || "Search failed");
-        }
+
+    const startTime = Date.now();
+
+    let resolvedData: WaterApiResponse | undefined;
+    let fetchError: string | null = null;
+
+    const dataPromise = fetch(`/api/water?postcode=${encodeURIComponent(raw)}`)
+      .then(async (res) => {
+        const data = (await res.json()) as WaterApiResponse;
+        resolvedData = data;
+        return data;
       })
-      .catch(() => setError("Search failed. Please try again."))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        fetchError = "Search failed. Please try again.";
+        return undefined;
+      });
+
+    try {
+      await sleep(400);
+      const dataAt400 = resolvedData;
+      setLoadingUi((prev) =>
+        prev
+          ? {
+              ...prev,
+              step1: {
+                phase: "done",
+                line: step1CompleteLine(dataAt400),
+              },
+            }
+          : prev
+      );
+
+      await sleep(Math.max(0, 500 - (Date.now() - startTime)));
+      setLoadingUi((prev) =>
+        prev
+          ? {
+              ...prev,
+              step2: {
+                phase: "spin",
+                line: "Fetching water quality data...",
+              },
+            }
+          : prev
+      );
+
+      await sleep(Math.max(0, 900 - (Date.now() - startTime)));
+      setLoadingUi((prev) =>
+        prev
+          ? {
+              ...prev,
+              step2: {
+                phase: "done",
+                line: "Lab results loaded",
+              },
+            }
+          : prev
+      );
+
+      await sleep(Math.max(0, 1000 - (Date.now() - startTime)));
+      setLoadingUi((prev) =>
+        prev
+          ? {
+              ...prev,
+              step3: {
+                phase: "spin",
+                line: "Checking nearby sewage overflows...",
+              },
+            }
+          : prev
+      );
+
+      const finalData = await dataPromise;
+
+      await sleep(Math.max(0, 1400 - (Date.now() - startTime)));
+
+      setLoadingUi((prev) =>
+        prev
+          ? {
+              ...prev,
+              step3: {
+                phase: "done",
+                line: step3CompleteLine(finalData),
+              },
+            }
+          : prev
+      );
+
+      const elapsed = Date.now() - startTime;
+      await sleep(Math.max(0, 1500 - elapsed));
+
+      setLoadingUi((prev) => (prev ? { ...prev, fading: true } : prev));
+      await sleep(300);
+
+      setLoadingUi(null);
+      setLoading(false);
+
+      if (fetchError) {
+        setError(fetchError);
+        return;
+      }
+      if (finalData?.error) {
+        setError(finalData.error || "Search failed");
+        return;
+      }
+      if (finalData) {
+        setResult({ data: finalData, searchValue });
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            resultsRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          });
+        });
+      } else {
+        setError("Search failed. Please try again.");
+      }
+    } catch {
+      setLoadingUi(null);
+      setLoading(false);
+      setError("Search failed. Please try again.");
+    }
+  }
+
+  function handleSearch(postcodeOverride?: string) {
+    void runSearch(postcodeOverride);
   }
 
   async function handleLeadSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -119,9 +331,10 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
       }
     : null;
 
+  const showHeroForm = !loading;
+
   return (
     <>
-      {/* Hero — postcode search */}
       <section className="px-4 pt-12 pb-10 sm:pt-16 sm:pb-12">
         <div className="mx-auto max-w-2xl">
           <h1 className="text-center text-3xl font-bold tracking-tight text-[#0f2942] sm:text-4xl">
@@ -131,73 +344,82 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
             Real 2024 lab data for every UK postcode
           </p>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSearch();
-            }}
-            className="mt-8 flex flex-col gap-4 sm:flex-row sm:gap-3"
-          >
-            <input
-              type="text"
-              value={postcode}
-              onChange={(e) => setPostcode(e.target.value)}
-              placeholder="Enter postcode or Eircode"
-              className="min-h-[52px] flex-1 rounded-lg border-2 border-[#0f2942]/20 bg-white px-4 py-3 text-lg text-[#1e293b] placeholder:text-[#64748b] focus:border-[#0891b2] focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="min-h-[52px] rounded-lg bg-[#0891b2] px-8 font-semibold text-white transition hover:bg-[#0e7490] disabled:cursor-not-allowed disabled:opacity-70"
+          {loading && loadingUi && (
+            <div
+              ref={loadingPanelRef}
+              className={`mt-8 rounded-2xl bg-[#0f2942] px-5 py-8 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-opacity duration-300 md:px-8 ${
+                loadingUi.fading ? "opacity-0" : "opacity-100"
+              }`}
+              aria-live="polite"
+              aria-busy="true"
             >
-              {loading ? "Searching…" : "Search"}
-            </button>
-          </form>
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-white/60">
+                Working on your report
+              </p>
+              <div className="space-y-1">
+                <StepRow phase={loadingUi.step1.phase} line={loadingUi.step1.line} />
+                <StepRow phase={loadingUi.step2.phase} line={loadingUi.step2.line} />
+                <StepRow phase={loadingUi.step3.phase} line={loadingUi.step3.line} />
+              </div>
+            </div>
+          )}
 
-          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:gap-6">
-            <label className="flex items-center gap-2 text-sm text-[#1e293b]">
-              <span className="font-medium">When was your home built?</span>
-              <select
-                value={homeBuilt}
-                onChange={(e) => setHomeBuilt(e.target.value)}
-                className="rounded border border-[#0f2942]/20 bg-white px-3 py-1.5 text-[#1e293b] focus:border-[#0891b2] focus:outline-none"
+          {showHeroForm && (
+            <>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSearch();
+                }}
+                className="mt-8 flex flex-col gap-4 sm:flex-row sm:gap-3"
               >
-                <option value="">Select…</option>
-                <option value="pre-1970">Pre-1970</option>
-                <option value="post-1970">Post-1970</option>
-              </select>
-            </label>
-          </div>
+                <input
+                  type="text"
+                  value={postcode}
+                  onChange={(e) => setPostcode(e.target.value)}
+                  placeholder="Enter postcode or Eircode"
+                  className="min-h-[52px] flex-1 rounded-lg border-2 border-[#0f2942]/20 bg-white px-4 py-3 text-lg text-[#1e293b] placeholder:text-[#64748b] focus:border-[#0891b2] focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="min-h-[52px] rounded-lg bg-[#0891b2] px-8 font-semibold text-white transition hover:bg-[#0e7490] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  Search
+                </button>
+              </form>
 
-          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Link
-              href="/water-quality"
-              className="group rounded-2xl border border-[#e2e8f0] border-l-4 border-l-transparent bg-white p-5 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-all hover:border-l-[#0891b2] hover:shadow-md"
-            >
-              <h2 className="text-base font-semibold text-[#0f2942] group-hover:text-[#0891b2]">
-                Tap water quality by town
-              </h2>
-              <p className="mt-1 text-sm text-[#64748b]">
-                DWI lab results for nitrates, lead, chlorine and fluoride — browse all
-                towns.
-              </p>
-              <p className="mt-3 text-sm font-semibold text-[#0891b2]">Browse towns →</p>
-            </Link>
-            <Link
-              href="/sewage-spills"
-              className="group rounded-2xl border border-[#e2e8f0] border-l-4 border-l-transparent bg-white p-5 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-all hover:border-l-[#0891b2] hover:shadow-md"
-            >
-              <h2 className="text-base font-semibold text-[#0f2942] group-hover:text-[#0891b2]">
-                Sewage spills by town
-              </h2>
-              <p className="mt-1 text-sm text-[#64748b]">
-                Environment Agency storm overflow counts and durations by town.
-              </p>
-              <p className="mt-3 text-sm font-semibold text-[#0891b2]">Browse towns →</p>
-            </Link>
-          </div>
+              <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Link
+                  href="/water-quality"
+                  className="group rounded-2xl border border-[#e2e8f0] border-l-4 border-l-transparent bg-white p-5 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-all hover:border-l-[#0891b2] hover:shadow-md"
+                >
+                  <h2 className="text-base font-semibold text-[#0f2942] group-hover:text-[#0891b2]">
+                    Tap water quality by town
+                  </h2>
+                  <p className="mt-1 text-sm text-[#64748b]">
+                    DWI lab results for nitrates, lead, chlorine and fluoride — browse all
+                    towns.
+                  </p>
+                  <p className="mt-3 text-sm font-semibold text-[#0891b2]">Browse towns →</p>
+                </Link>
+                <Link
+                  href="/sewage-spills"
+                  className="group rounded-2xl border border-[#e2e8f0] border-l-4 border-l-transparent bg-white p-5 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-all hover:border-l-[#0891b2] hover:shadow-md"
+                >
+                  <h2 className="text-base font-semibold text-[#0f2942] group-hover:text-[#0891b2]">
+                    Sewage spills by town
+                  </h2>
+                  <p className="mt-1 text-sm text-[#64748b]">
+                    Environment Agency storm overflow counts and durations by town.
+                  </p>
+                  <p className="mt-3 text-sm font-semibold text-[#0891b2]">Browse towns →</p>
+                </Link>
+              </div>
+            </>
+          )}
 
-          {error && (
+          {showHeroForm && error && (
             <div className="mt-4 rounded-lg border border-[#dc2626]/30 bg-[#dc2626]/10 p-4 text-[#dc2626]">
               {error}
             </div>
@@ -206,73 +428,80 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
       </section>
 
       <div ref={resultsRef}>
-      {loading && (
-        <div className="h-[3px] w-full overflow-hidden bg-[#0f2942]">
-          <div className="h-full w-1/4 bg-[#0891b2] animate-[progressSweep_1.2s_ease-in-out_infinite" />
-        </div>
-      )}
+        {result && (
+          <section className="border-t border-[#0f2942]/10 bg-white px-4 py-10 sm:py-14">
+            <div className="mx-auto max-w-2xl">
+              <h2 className="text-xl font-bold text-[#0f2942] sm:text-2xl">
+                Water Quality Report
+                {result.data.comingSoon
+                  ? ""
+                  : result.data.adminDistrict
+                    ? ` for ${result.data.adminDistrict}`
+                    : ""}
+              </h2>
 
-      {/* Results */}
-      {result && (
-        <section className="border-t border-[#0f2942]/10 bg-white px-4 py-10 sm:py-14">
-          <div className="mx-auto max-w-2xl">
-            <h2 className="text-xl font-bold text-[#0f2942] sm:text-2xl">
-              Water Quality Report
-              {result.data.comingSoon
-                ? ""
-                : result.data.adminDistrict
-                  ? ` for ${result.data.adminDistrict}`
-                  : ""}
-            </h2>
-
-            {result.data.comingSoon ? (
-              <div className="mt-6 rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-6">
-                <p className="font-semibold text-[#0f2942]">Scottish Water</p>
-                <p className="mt-2 text-[#1e293b]">
-                  We&apos;re working on bringing Scottish water quality data to the
-                  directory. In the meantime, check your local water quality at{" "}
-                  <a
-                    href="https://www.scottishwater.co.uk/your-home/your-water/water-quality/water-quality"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-[#0891b2] underline hover:text-[#0e7490]"
+              <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+                <label className="flex flex-col gap-2 text-sm text-[#1e293b] sm:flex-row sm:items-center">
+                  <span className="font-medium">When was your home built?</span>
+                  <select
+                    value={homeBuilt}
+                    onChange={(e) => setHomeBuilt(e.target.value)}
+                    className="rounded border border-[#0f2942]/20 bg-white px-3 py-1.5 text-[#1e293b] focus:border-[#0891b2] focus:outline-none"
                   >
-                    scottishwater.co.uk
-                  </a>
-                </p>
+                    <option value="">Select…</option>
+                    <option value="pre-1970">Pre-1970</option>
+                    <option value="post-1970">Post-1970</option>
+                  </select>
+                </label>
               </div>
-            ) : scorecardData ? (
-              <>
-                <WaterScorecard data={scorecardData} />
-                {hasLeadRisk && (
-                  <div className="mt-6 rounded-lg border border-[#d97706]/30 bg-[#d97706]/5 p-4">
-                    <p className="font-semibold text-[#d97706]">Lead pipe warning</p>
-                    <p className="mt-1 text-sm text-[#1e293b]">
-                      Homes built before 1970 often have lead pipes or lead solder in
-                      plumbing. Lead can leach into drinking water and pose health
-                      risks, especially for children. Consider having your water
-                      tested and replacing lead pipes.
-                    </p>
-                  </div>
-                )}
-                <div className="mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setLeadModalOpen(true)}
-                    disabled={leadSubmitted}
-                    className="rounded-lg bg-[#0f2942] px-4 py-2 font-semibold text-white hover:bg-[#1e3a5f] disabled:cursor-not-allowed disabled:bg-[#22c55e]"
-                  >
-                    {leadSubmitted ? "Survey requested ✓" : "Request professional water survey"}
-                  </button>
+
+              {result.data.comingSoon ? (
+                <div className="mt-6 rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-6">
+                  <p className="font-semibold text-[#0f2942]">Scottish Water</p>
+                  <p className="mt-2 text-[#1e293b]">
+                    We&apos;re working on bringing Scottish water quality data to the
+                    directory. In the meantime, check your local water quality at{" "}
+                    <a
+                      href="https://www.scottishwater.co.uk/your-home/your-water/water-quality/water-quality"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-[#0891b2] underline hover:text-[#0e7490]"
+                    >
+                      scottishwater.co.uk
+                    </a>
+                  </p>
                 </div>
-              </>
-            ) : null}
-          </div>
-        </section>
-      )}
+              ) : scorecardData ? (
+                <div className="mt-6">
+                  <WaterScorecard data={scorecardData} />
+                  {hasLeadRisk && (
+                    <div className="mt-6 rounded-lg border border-[#d97706]/30 bg-[#d97706]/5 p-4">
+                      <p className="font-semibold text-[#d97706]">Lead pipe warning</p>
+                      <p className="mt-1 text-sm text-[#1e293b]">
+                        Homes built before 1970 often have lead pipes or lead solder in
+                        plumbing. Lead can leach into drinking water and pose health risks,
+                        especially for children. Consider having your water tested and
+                        replacing lead pipes.
+                      </p>
+                    </div>
+                  )}
+                  <div className="mt-6">
+                    <button
+                      type="button"
+                      onClick={() => setLeadModalOpen(true)}
+                      disabled={leadSubmitted}
+                      className="rounded-lg bg-[#0f2942] px-4 py-2 font-semibold text-white hover:bg-[#1e3a5f] disabled:cursor-not-allowed disabled:bg-[#22c55e]"
+                    >
+                      {leadSubmitted ? "Survey requested ✓" : "Request professional water survey"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        )}
       </div>
 
-      {/* Stats + audience entry points — always visible below search */}
       <section className="border-t border-[#0f2942]/10 px-4 py-12 sm:py-16">
         <div className="mx-auto max-w-4xl">
           <div className="grid gap-8 sm:grid-cols-3">
@@ -288,23 +517,19 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
               <p className="font-bold tabular-nums text-3xl text-[#0891b2] sm:text-4xl">
                 100,000+
               </p>
-              <p className="mt-1 text-sm font-medium text-[#0f2942]">
-                zones mapped
-              </p>
+              <p className="mt-1 text-sm font-medium text-[#0f2942]">zones mapped</p>
             </div>
             <div className="text-center">
               <p className="font-bold tabular-nums text-3xl text-[#0891b2] sm:text-4xl">
                 DWI
               </p>
-              <p className="mt-1 text-sm font-medium text-[#0f2942]">
-                real lab data
-              </p>
+              <p className="mt-1 text-sm font-medium text-[#0f2942]">real lab data</p>
             </div>
           </div>
 
           <p className="mt-8 text-center text-sm text-[#64748b]">
-            Data sourced from the Drinking Water Inspectorate via the Stream open
-            data initiative
+            Data sourced from the Drinking Water Inspectorate via the Stream open data
+            initiative
           </p>
 
           <div className="mt-10 grid gap-6 sm:grid-cols-3">
@@ -316,9 +541,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
               <p className="mt-2 text-sm text-[#64748b]">
                 Nitrates, lead and formula — what parents need to know
               </p>
-              <p className="mt-3 text-sm font-medium text-[#0891b2]">
-                Parents hub →
-              </p>
+              <p className="mt-3 text-sm font-medium text-[#0891b2]">Parents hub →</p>
             </a>
             <a
               href="/hard-water-skin-health"
@@ -328,9 +551,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
               <p className="mt-2 text-sm text-[#64748b]">
                 Hard water and skin — the evidence
               </p>
-              <p className="mt-3 text-sm font-medium text-[#0891b2]">
-                Skin & health hub →
-              </p>
+              <p className="mt-3 text-sm font-medium text-[#0891b2]">Skin & health hub →</p>
             </a>
             <a
               href="/water-quality-home-buying"
@@ -340,15 +561,12 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
               <p className="mt-2 text-sm text-[#64748b]">
                 What to check before you exchange
               </p>
-              <p className="mt-3 text-sm font-medium text-[#0891b2]">
-                Homebuyers hub →
-              </p>
+              <p className="mt-3 text-sm font-medium text-[#0891b2]">Homebuyers hub →</p>
             </a>
           </div>
         </div>
       </section>
 
-      {/* Lead Modal */}
       {leadModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"

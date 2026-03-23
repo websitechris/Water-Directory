@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { SewageCharts } from "@/components/SewageCharts";
+import { SewageSitesTable } from "@/components/SewageSitesTable";
 import { querySewageSpillsNearPoint } from "@/lib/arcgis-sewage";
 import { getTownBySlug, TOWNS } from "@/lib/towns";
+import type { SpillSite } from "@/types/water";
 
 const RADIUS_M = 5000;
 const EA_DATASET_URL =
@@ -49,10 +52,90 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-function spillCountClass(spills: number): string {
-  if (spills > 100) return "text-[#dc2626]";
-  if (spills > 50) return "text-[#d97706]";
-  return "text-[#0f2942]";
+/** Dominant operator by summed spill count (for header subtitle). */
+function primaryWaterCompanyLine(sites: SpillSite[]): string {
+  if (sites.length === 0) {
+    return "No monitored overflow sites were returned within 5 km for this search.";
+  }
+  const map = new Map<string, number>();
+  for (const s of sites) {
+    const c = (s.company || "Unknown operator").trim();
+    map.set(c, (map.get(c) ?? 0) + s.spills);
+  }
+  let best = "";
+  let max = -1;
+  for (const [c, v] of map) {
+    if (v > max) {
+      max = v;
+      best = c;
+    }
+  }
+  if (map.size === 1) {
+    return `Includes overflow assets operated by ${best} within ${RADIUS_M / 1000} km of the town centre.`;
+  }
+  return `Includes sites operated by ${best} and other water companies within ${RADIUS_M / 1000} km of the town centre.`;
+}
+
+function BeakerIcon() {
+  return (
+    <svg
+      className="h-8 w-8 shrink-0 text-[#0891b2]"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M4.867 19.125h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008v-.008Zm2.25 0h.008v.008h-.008v-.008Zm2.25 0h.008v.008h-.008v-.008Zm2.25 0h.008v.008h-.008v-.008Zm2.25 0h.008v.008h-.008v-.008Zm2.25 0h.008v.008h-.008v-.008Z"
+      />
+    </svg>
+  );
+}
+
+function MapPinIcon() {
+  return (
+    <svg
+      className="h-8 w-8 shrink-0 text-[#0891b2]"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19.5 10.5c0 7.125-6 12.375-7.5 12.375S4.5 17.625 4.5 10.5a7.5 7.5 0 1 1 15 0Z"
+      />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg
+      className="mt-0.5 h-5 w-5 shrink-0 text-[#d97706]"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+      />
+    </svg>
+  );
 }
 
 export default async function SewageSpillsTownPage({ params }: PageProps) {
@@ -61,10 +144,13 @@ export default async function SewageSpillsTownPage({ params }: PageProps) {
   if (!payload) notFound();
 
   const { town, sites, primaryYear, totalSpills, totalHours, siteCount } = payload;
+  const subtitle = primaryWaterCompanyLine(sites);
+  const equivalentDays =
+    totalHours > 0 ? Math.round((totalHours / 24) * 10) / 10 : 0;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 pb-16 pt-8">
-      <nav className="mb-6 text-sm text-[#64748b]">
+    <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
+      <nav className="mb-6 text-sm text-[#64748b]" aria-label="Breadcrumb">
         <Link href="/" className="text-[#0891b2] hover:underline">
           Home
         </Link>
@@ -74,154 +160,156 @@ export default async function SewageSpillsTownPage({ params }: PageProps) {
         <span className="text-[#1e293b]">{town.name}</span>
       </nav>
 
-      <h1 className="text-3xl font-bold tracking-tight text-[#0f2942] md:text-4xl">
-        Sewage Spills in {town.name}
-      </h1>
-      <p className="mt-2 text-sm text-[#64748b]">
-        {town.county}, England · Within {RADIUS_M / 1000} km of town centre
-      </p>
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight text-[#0f2942] md:text-4xl">
+          Sewage spills in {town.name}
+        </h1>
+        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[#64748b] md:text-base">
+          {subtitle}
+        </p>
+      </header>
 
       {/* Hero stat bar */}
       <section
-        className="mt-8 rounded-lg bg-[#0f2942] px-4 py-8 text-white md:px-8"
+        className="rounded-2xl bg-[#0f2942] px-5 py-8 text-white shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] md:px-10"
         aria-label="Summary statistics"
       >
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-4">
+        <div className="grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-6">
           <div className="text-center sm:text-left">
-            <p className="text-4xl font-bold tabular-nums">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#0891b2]">
+              Total spills
+            </p>
+            <p className="mt-2 text-4xl font-bold tabular-nums md:text-5xl">
               {totalSpills.toLocaleString()}
             </p>
-            <p className="mt-1 text-sm text-white/85">Sewage spills</p>
           </div>
           <div className="text-center sm:text-left">
-            <p className="text-4xl font-bold tabular-nums">
-              {totalHours.toLocaleString()}
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#d97706]">
+              Duration
             </p>
-            <p className="mt-1 text-sm text-white/85">Hours discharged</p>
+            <p className="mt-2 text-4xl font-bold tabular-nums md:text-5xl">
+              {totalHours.toLocaleString()}
+              <span className="ml-1 text-2xl font-semibold text-white/90">hrs</span>
+            </p>
           </div>
           <div className="text-center sm:text-left">
-            <p className="text-4xl font-bold tabular-nums">
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/90">
+              Infrastructure
+            </p>
+            <p className="mt-2 text-4xl font-bold tabular-nums md:text-5xl">
               {siteCount.toLocaleString()}
             </p>
-            <p className="mt-1 text-sm text-white/85">Overflow sites</p>
           </div>
         </div>
-        <p className="mt-6 border-t border-white/20 pt-4 text-center text-sm text-white/80 sm:text-left">
-          Based on Environment Agency data for {primaryYear}
+        <p className="mt-8 border-t border-white/15 pt-5 text-center text-sm text-white/75 sm:text-left">
+          Based on the latest Environment Agency data ({primaryYear})
         </p>
       </section>
 
-      {/* Worst offenders */}
-      <section className="mt-12">
-        <h2 className="text-xl font-semibold text-[#0f2942]">
-          Worst overflow sites near {town.name}
-        </h2>
-        <p className="mt-1 text-sm text-[#64748b]">
-          Sites ordered by spill count (most recent reporting year with spills, per
-          site). Counts use the EA 12–24 hour method.
-        </p>
-
-        {sites.length === 0 ? (
-          <p className="mt-6 rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-6 text-sm text-[#64748b]">
-            No storm overflow discharge data was returned for this area in the
-            current dataset. This can happen where monitors were not yet reporting
-            or no sites fall within the search radius.
-          </p>
-        ) : (
-          <div className="mt-6 overflow-hidden rounded-lg border border-[#0f2942]/10 bg-white shadow-sm">
-            <ul className="divide-y divide-[#e2e8f0]">
-              {sites.map((site) => (
-                <li
-                  key={`${site.name}-${site.year}`}
-                  className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-[#1e293b]">{site.name}</p>
-                    <p className="mt-0.5 text-xs text-[#64748b]">
-                      {site.company || "Water company not listed"}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap items-baseline gap-4 sm:justify-end sm:text-right">
-                    <div>
-                      <span
-                        className={`text-lg font-bold tabular-nums ${spillCountClass(site.spills)}`}
-                      >
-                        {site.spills.toLocaleString()}
-                      </span>
-                      <span className="ml-1 text-xs font-normal text-[#64748b]">
-                        spills
-                      </span>
-                    </div>
-                    <div className="text-sm tabular-nums text-[#64748b]">
-                      {site.hours.toLocaleString()} hrs
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+      {/* Context callout — hours */}
+      {siteCount > 0 && totalHours > 0 && (
+        <section
+          className="mt-8 rounded-2xl border border-[#e2e8f0] border-l-4 border-l-[#d97706] bg-white p-5 shadow-sm md:p-6"
+          aria-labelledby="hours-callout-heading"
+        >
+          <div className="flex gap-3">
+            <ClockIcon />
+            <div>
+              <h2
+                id="hours-callout-heading"
+                className="text-base font-semibold text-[#0f2942]"
+              >
+                What does {totalHours.toLocaleString()} hours mean?
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-[#475569]">
+                Combined across all {siteCount.toLocaleString()} sites in {town.name},
+                that is equivalent to sewage being discharged continuously for{" "}
+                <strong className="font-semibold text-[#0f2942]">
+                  {equivalentDays.toLocaleString()} days
+                </strong>{" "}
+                non-stop into local waterways (if all reported hours ran back-to-back).
+                In practice, spills are separate events spread across the year.
+              </p>
+            </div>
           </div>
-        )}
+        </section>
+      )}
+
+      {/* Charts */}
+      <section className="mt-10" aria-label="Charts">
+        <SewageCharts sites={sites} />
       </section>
 
-      {/* Context */}
-      <section className="mt-12 rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-6">
-        <h2 className="text-lg font-semibold text-[#0f2942]">What this means</h2>
-        <p className="mt-3 text-sm leading-relaxed text-[#475569]">
-          Storm overflows are part of the sewerage system in England. During heavy
-          rainfall, they can discharge excess diluted wastewater to reduce the risk
-          of flooding homes and streets. The Environment Agency requires water
-          companies to monitor many of these overflows and report how often they
-          operate and for how long. The figures here are from those official annual
-          returns — they describe reported discharges, not every pipe in the area.
-        </p>
-        <p className="mt-3 text-sm">
+      {/* Detailed table */}
+      <section className="mt-10">
+        <h2 className="mb-4 text-lg font-semibold text-[#0f2942]">
+          Site details
+        </h2>
+        <p className="mb-4 text-sm text-[#64748b]">
+          Counts use the EA 12–24 hour reporting method for the most recent year with
+          spills, per site.{" "}
           <a
             href={EA_DATASET_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="font-medium text-[#0891b2] hover:underline"
           >
-            Event Duration Monitoring — storm overflows (Environment Agency)
+            Environment Agency EDM dataset
           </a>
+          .
         </p>
+        {sites.length === 0 ? (
+          <p className="rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] p-6 text-sm text-[#64748b]">
+            No storm overflow discharge data was returned for this area. Monitors may
+            not yet report for all assets, or no sites fall within the search radius.
+          </p>
+        ) : (
+          <SewageSitesTable sites={sites} />
+        )}
       </section>
 
       {/* Cross-links */}
-      <section className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <section className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2">
         <Link
           href={`/?postcode=${encodeURIComponent(town.postcode)}`}
-          className="rounded-lg border border-t border-r border-b border-[#e2e8f0] border-l-4 border-l-[#0891b2] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+          className="flex gap-4 rounded-2xl border border-[#e2e8f0] bg-white p-6 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-shadow hover:shadow-md"
         >
-          <p className="font-semibold text-[#0f2942]">
-            Tap water quality in {town.name}
-          </p>
-          <p className="mt-1 text-sm text-[#64748b]">
-            Nitrates, lead and other parameters for this area.
-          </p>
+          <BeakerIcon />
+          <div>
+            <p className="font-semibold text-[#0f2942]">
+              Check {town.name} tap water quality
+            </p>
+            <p className="mt-1 text-sm text-[#64748b]">
+              Nitrates, lead, chlorine and hardness for a representative postcode.
+            </p>
+          </div>
         </Link>
         <Link
           href="/"
-          className="rounded-lg border border-t border-r border-b border-[#e2e8f0] border-l-4 border-l-[#0891b2] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+          className="flex gap-4 rounded-2xl border border-[#e2e8f0] bg-white p-6 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-shadow hover:shadow-md"
         >
-          <p className="font-semibold text-[#0f2942]">Check your postcode</p>
-          <p className="mt-1 text-sm text-[#64748b]">
-            Look up lab results and nearby overflows from your address.
-          </p>
+          <MapPinIcon />
+          <div>
+            <p className="font-semibold text-[#0f2942]">Search another area</p>
+            <p className="mt-1 text-sm text-[#64748b]">
+              Enter any UK postcode for water quality and nearby overflows.
+            </p>
+          </div>
         </Link>
       </section>
 
-      <footer className="mt-12 border-t border-[#e2e8f0] pt-6 text-center text-xs text-[#64748b]">
-        Sewage overflow data sourced live from the Environment Agency Event
-        Duration Monitoring dataset under the{" "}
+      <footer className="mt-14 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-5 text-center text-xs leading-relaxed text-[#64748b]">
+        Contains public sector information licensed under the{" "}
         <a
           href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[#0891b2] hover:underline"
+          className="font-medium text-[#0891b2] hover:underline"
         >
-          Open Government Licence v3
+          Open Government Licence v3.0
         </a>
-        .
+        . Storm overflow data from the Environment Agency Event Duration Monitoring
+        programme.
       </footer>
     </main>
   );

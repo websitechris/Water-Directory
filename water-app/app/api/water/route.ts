@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import type { WaterApiResponse, SpillSite } from "@/types/water";
+import { querySewageSpillsNearPoint } from "@/lib/arcgis-sewage";
+import type { WaterApiResponse } from "@/types/water";
 
 export const dynamic = "force-dynamic";
 
@@ -13,59 +14,11 @@ function formatPostcodeForApi(raw: string): string {
   return s.slice(0, -3) + " " + s.slice(-3);
 }
 
+/** Postcode lookup: 2 km radius, top 5 sites by spill count (EA ArcGIS). */
 async function getSewageSpills(lat: number, lng: number) {
-  const url = new URL(
-    "https://services1.arcgis.com/JZM7qJpmv7vJ0Hzx/arcgis/rest/services/edm_data_full_names/FeatureServer/0/query"
-  );
-  url.searchParams.set("geometry", JSON.stringify({ x: lng, y: lat }));
-  url.searchParams.set("geometryType", "esriGeometryPoint");
-  url.searchParams.set("spatialRel", "esriSpatialRelIntersects");
-  url.searchParams.set("distance", "2000");
-  url.searchParams.set("units", "esriSRUnit_Meter");
-  url.searchParams.set("inSR", "4326");
-  url.searchParams.set(
-    "outFields",
-    "Site_Name_EA_Consents_Database_,Counted_spills_using_12_24h_cou,Total_Duration__hrs__all_spills,year,Water_Company_Name"
-  );
-  url.searchParams.set("orderByFields", "year DESC");
-  url.searchParams.set("resultRecordCount", "100");
-  url.searchParams.set("f", "json");
-
   try {
-    const res = await fetch(url.toString(), { next: { revalidate: 86400 } });
-    const data = await res.json();
-    if (!data.features?.length) return [];
-
-    // Group all years per site
-    const sitesByName = new Map<string, Record<string, unknown>[]>();
-    for (const f of data.features) {
-      const a = f.attributes as Record<string, unknown>;
-      const name = (a.Site_Name_EA_Consents_Database_ ?? "Unknown site") as string;
-      const key = name.trim().toUpperCase();
-      if (!sitesByName.has(key)) sitesByName.set(key, []);
-      sitesByName.get(key)!.push(a);
-    }
-
-    const results: SpillSite[] = [];
-    for (const [name, years] of sitesByName) {
-      // Prefer most recent year with spills > 0; fall back to most recent year
-      const withSpills = years
-        .filter((a) => ((a.Counted_spills_using_12_24h_cou as number) ?? 0) > 0)
-        .sort((a, b) => String(b.year ?? "").localeCompare(String(a.year ?? "")));
-      const best =
-        withSpills[0] ??
-        years.sort((a, b) => String(b.year ?? "").localeCompare(String(a.year ?? "")))[0];
-      if (!best || ((best.Counted_spills_using_12_24h_cou as number) ?? 0) === 0) continue;
-      results.push({
-        name,
-        spills: (best.Counted_spills_using_12_24h_cou as number) ?? 0,
-        hours: Math.round((best.Total_Duration__hrs__all_spills as number) ?? 0),
-        year: String(best.year ?? "").replace(/- | -/g, "").trim(),
-        company: (best.Water_Company_Name as string) ?? "",
-      });
-    }
-
-    return results.sort((a, b) => b.spills - a.spills).slice(0, 5);
+    const { sites } = await querySewageSpillsNearPoint(lat, lng, 2000);
+    return sites.slice(0, 5);
   } catch {
     return [];
   }

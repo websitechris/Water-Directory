@@ -286,24 +286,19 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <span
-          className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
-            data.propertyValueImpact === "high"
-              ? "bg-[#d97706]/20 text-[#d97706]"
-              : "bg-[#0f2942]/10 text-[#64748b]"
-          }`}
-        >
-          Property value: {data.propertyValueImpact === "high" ? "High" : "Low/neutral"}
-        </span>
-        <span
-          className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
-            data.familyHealthScore === "review"
-              ? "bg-[#d97706]/20 text-[#d97706]"
-              : "bg-[#22c55e]/20 text-[#22c55e]"
-          }`}
-        >
-          Family health: {data.familyHealthScore === "review" ? "Review" : "Good"}
-        </span>
+        {hasSpills ? (
+          <span className="rounded-md bg-[#d97706]/20 px-2.5 py-1 text-xs font-semibold text-[#d97706]">
+            ⚠️ Sewage spills nearby
+          </span>
+        ) : chemicalsNeedAttention ? (
+          <span className="rounded-md bg-[#d97706]/20 px-2.5 py-1 text-xs font-semibold text-[#d97706]">
+            ⚠️ Chemicals need attention
+          </span>
+        ) : (
+          <span className="rounded-md bg-[#22c55e]/20 px-2.5 py-1 text-xs font-semibold text-[#22c55e]">
+            ✓ All checks passed
+          </span>
+        )}
       </div>
 
       <div

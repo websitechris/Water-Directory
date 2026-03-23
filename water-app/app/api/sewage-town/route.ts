@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimitOrNull } from "@/lib/api-rate-limit";
 import { querySewageSpillsNearPoint } from "@/lib/arcgis-sewage";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
  * GET ?lat=53.96&lng=-1.08&radius=5000 (radius in metres, default 5000)
  */
 export async function GET(request: NextRequest) {
+  const limited = rateLimitOrNull(request);
+  if (limited) return limited;
+
   const latRaw = request.nextUrl.searchParams.get("lat");
   const lngRaw = request.nextUrl.searchParams.get("lng");
   const radiusRaw = request.nextUrl.searchParams.get("radius");

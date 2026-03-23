@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimitOrNull } from "@/lib/api-rate-limit";
 import { querySewageSpillsNearPoint } from "@/lib/arcgis-sewage";
 import type { WaterApiResponse } from "@/types/water";
 
@@ -122,6 +123,9 @@ async function fetchMetaOnly(
 }
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimitOrNull(request);
+  if (limited) return limited;
+
   const postcode = request.nextUrl.searchParams.get("postcode")?.trim();
   const metaOnly = request.nextUrl.searchParams.get("metaOnly") === "true";
   if (!postcode) {
@@ -137,6 +141,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimitOrNull(request);
+  if (limited) return limited;
+
   let body: { postcode?: string };
   try {
     body = await request.json();

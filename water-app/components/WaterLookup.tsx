@@ -40,6 +40,9 @@ function step3CompleteLine(data: WaterApiResponse | undefined): string {
   return `${n} overflow site${n === 1 ? "" : "s"} found within 2km`;
 }
 
+/** Property age for lead-pipe context; only pre-1970 triggers the warning. */
+type HomeBuiltValue = "pre-1970" | "post-1970" | "not-sure";
+
 type StepPhase = "hidden" | "spin" | "done";
 
 type LoadingUi = {
@@ -94,12 +97,58 @@ function StepRow({
   );
 }
 
+const HOME_AGE_OPTIONS: { value: HomeBuiltValue; label: string }[] = [
+  { value: "pre-1970", label: "Pre-1970" },
+  { value: "post-1970", label: "Post-1970" },
+  { value: "not-sure", label: "Not sure" },
+];
+
+function LoadingPanelHouseAge({
+  homeBuilt,
+  onChange,
+}: {
+  homeBuilt: HomeBuiltValue;
+  onChange: (v: HomeBuiltValue) => void;
+}) {
+  return (
+    <div
+      className="mt-8 border-t border-white/15 pt-6"
+      role="group"
+      aria-label="When was your home built?"
+    >
+      <p className="text-sm font-medium text-white">When was your home built?</p>
+      <p className="mt-1 text-xs text-white/60">
+        Optional — we&apos;ll tailor your report. Loading continues either way.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {HOME_AGE_OPTIONS.map(({ value, label }) => {
+          const selected = homeBuilt === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onChange(value)}
+              className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                selected
+                  ? "border-[#0891b2] bg-[#0891b2] text-white"
+                  : "border-white/30 bg-transparent text-white hover:border-white/50 hover:bg-white/5"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function WaterLookup({ initialPostcode }: WaterLookupProps) {
   const router = useRouter();
   const resultsRef = useRef<HTMLDivElement>(null);
   const loadingPanelRef = useRef<HTMLDivElement>(null);
   const [postcode, setPostcode] = useState(initialPostcode ?? "");
-  const [homeBuilt, setHomeBuilt] = useState("");
+  const [homeBuilt, setHomeBuilt] = useState<HomeBuiltValue>("not-sure");
   const [loading, setLoading] = useState(false);
   const [loadingUi, setLoadingUi] = useState<LoadingUi | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +181,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
     setLoading(true);
     setError(null);
     setResult(null);
+    setHomeBuilt("not-sure");
     setLoadingUi({
       fading: false,
       step1: { phase: "spin", line: "Looking up your postcode..." },
@@ -361,6 +411,9 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
                 <StepRow phase={loadingUi.step2.phase} line={loadingUi.step2.line} />
                 <StepRow phase={loadingUi.step3.phase} line={loadingUi.step3.line} />
               </div>
+              {loadingUi.step2.phase === "done" && !loadingUi.fading && (
+                <LoadingPanelHouseAge homeBuilt={homeBuilt} onChange={setHomeBuilt} />
+              )}
             </div>
           )}
 
@@ -439,21 +492,6 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
                     ? ` for ${result.data.adminDistrict}`
                     : ""}
               </h2>
-
-              <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-                <label className="flex flex-col gap-2 text-sm text-[#1e293b] sm:flex-row sm:items-center">
-                  <span className="font-medium">When was your home built?</span>
-                  <select
-                    value={homeBuilt}
-                    onChange={(e) => setHomeBuilt(e.target.value)}
-                    className="rounded border border-[#0f2942]/20 bg-white px-3 py-1.5 text-[#1e293b] focus:border-[#0891b2] focus:outline-none"
-                  >
-                    <option value="">Select…</option>
-                    <option value="pre-1970">Pre-1970</option>
-                    <option value="post-1970">Post-1970</option>
-                  </select>
-                </label>
-              </div>
 
               {result.data.comingSoon ? (
                 <div className="mt-6 rounded-lg border border-[#0f2942]/10 bg-[#f8fafc] p-6">
@@ -642,7 +680,9 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
                     </label>
                     <select
                       name="property_age"
-                      defaultValue={homeBuilt}
+                      defaultValue={
+                        homeBuilt === "not-sure" ? "" : homeBuilt
+                      }
                       className="mt-1 w-full rounded-lg border border-[#0f2942]/20 px-3 py-2 focus:border-[#0891b2] focus:outline-none"
                     >
                       <option value="">Select…</option>

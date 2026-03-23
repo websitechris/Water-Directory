@@ -155,7 +155,9 @@ export default async function SewageSpillsTownPage({ params }: PageProps) {
           Home
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-[#1e293b]">Sewage spills</span>
+        <Link href="/sewage-spills" className="text-[#0891b2] hover:underline">
+          Sewage spills
+        </Link>
         <span className="mx-2">/</span>
         <span className="text-[#1e293b]">{town.name}</span>
       </nav>

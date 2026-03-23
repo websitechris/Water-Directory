@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { WaterScorecard } from "./WaterScorecard";
 import type { WaterScorecardData } from "./WaterScorecard";
@@ -166,6 +167,34 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
                 <option value="post-1970">Post-1970</option>
               </select>
             </label>
+          </div>
+
+          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Link
+              href="/water-quality"
+              className="group rounded-2xl border border-[#e2e8f0] border-l-4 border-l-transparent bg-white p-5 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-all hover:border-l-[#0891b2] hover:shadow-md"
+            >
+              <h2 className="text-base font-semibold text-[#0f2942] group-hover:text-[#0891b2]">
+                Tap water quality by town
+              </h2>
+              <p className="mt-1 text-sm text-[#64748b]">
+                DWI lab results for nitrates, lead, chlorine and fluoride — browse all
+                towns.
+              </p>
+              <p className="mt-3 text-sm font-semibold text-[#0891b2]">Browse towns →</p>
+            </Link>
+            <Link
+              href="/sewage-spills"
+              className="group rounded-2xl border border-[#e2e8f0] border-l-4 border-l-transparent bg-white p-5 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-all hover:border-l-[#0891b2] hover:shadow-md"
+            >
+              <h2 className="text-base font-semibold text-[#0f2942] group-hover:text-[#0891b2]">
+                Sewage spills by town
+              </h2>
+              <p className="mt-1 text-sm text-[#64748b]">
+                Environment Agency storm overflow counts and durations by town.
+              </p>
+              <p className="mt-3 text-sm font-semibold text-[#0891b2]">Browse towns →</p>
+            </Link>
           </div>
 
           {error && (

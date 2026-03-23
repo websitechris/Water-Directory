@@ -164,7 +164,9 @@ export default async function TownWaterQualityPage({ params }: PageProps) {
             Home
           </Link>
           <span className="mx-2">/</span>
-          <span className="text-[#1e293b]">Water quality</span>
+          <Link href="/water-quality" className="text-[#0891b2] hover:underline">
+            Water quality
+          </Link>
           <span className="mx-2">/</span>
           <span className="text-[#1e293b]">{town.name}</span>
         </nav>
@@ -211,7 +213,9 @@ export default async function TownWaterQualityPage({ params }: PageProps) {
           Home
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-[#1e293b]">Water quality</span>
+        <Link href="/water-quality" className="text-[#0891b2] hover:underline">
+          Water quality
+        </Link>
         <span className="mx-2">/</span>
         <span className="text-[#1e293b]">{town.name}</span>
       </nav>

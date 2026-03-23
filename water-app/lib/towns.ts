@@ -136,3 +136,8 @@ export const TOWNS: Town[] = [
 export function getTownBySlug(slug: string): Town | undefined {
   return TOWNS.find((t) => t.slug === slug);
 }
+
+/** Alphabetical by display name — for hub listing pages. */
+export function getTownsSortedAlphabetically(): Town[] {
+  return [...TOWNS].sort((a, b) => a.name.localeCompare(b.name, "en-GB"));
+}

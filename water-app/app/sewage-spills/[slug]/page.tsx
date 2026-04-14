@@ -5,6 +5,7 @@ import { cache } from "react";
 import { SewageCharts } from "@/components/SewageCharts";
 import { SewageSitesTable } from "@/components/SewageSitesTable";
 import { querySewageSpillsNearPoint } from "@/lib/arcgis-sewage";
+import { getSiteUrl } from "@/lib/site-url";
 import { getTownBySlug, TOWNS } from "@/lib/towns";
 import type { SpillSite } from "@/types/water";
 
@@ -34,16 +35,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: "Town not found | Water Directory" };
   }
   const { town, totalSpills, totalHours, primaryYear } = payload;
-  const base = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+  const base = getSiteUrl();
   const title = `Sewage Spills in ${town.name} — ${primaryYear} Storm Overflow Data | Water Directory`;
   const description = `${town.name} had ${totalSpills.toLocaleString()} sewage spills totalling ${totalHours.toLocaleString()} hours in ${primaryYear}. See the worst overflow sites near ${town.name} from official Environment Agency data.`;
 
   return {
     title,
     description,
-    ...(base
-      ? { alternates: { canonical: `${base}/sewage-spills/${slug}` } }
-      : {}),
+    alternates: { canonical: `${base}/sewage-spills/${slug}` },
     openGraph: {
       title,
       description,

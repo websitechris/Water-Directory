@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getSiteUrl } from "@/lib/site-url";
 import { getTownsLive } from "@/lib/towns";
 
 const cardClass =
@@ -9,13 +10,9 @@ export const metadata: Metadata = {
   title: "Tap Water Quality by Town — Lab Results | Water Directory",
   description:
     "See tap water quality data for towns across the UK. Official DWI laboratory results for nitrates, chlorine, lead and fluoride.",
-  ...(process.env.NEXT_PUBLIC_SITE_URL
-    ? {
-        alternates: {
-          canonical: `${process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")}/water-quality`,
-        },
-      }
-    : {}),
+  alternates: {
+    canonical: `${getSiteUrl()}/water-quality`,
+  },
   openGraph: {
     title: "Tap Water Quality by Town — Lab Results | Water Directory",
     description:

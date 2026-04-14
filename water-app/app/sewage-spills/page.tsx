@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getSiteUrl } from "@/lib/site-url";
 import { getTownsLive } from "@/lib/towns";
 
 const cardClass =
@@ -9,13 +10,9 @@ export const metadata: Metadata = {
   title: "Sewage Spills by Town — Storm Overflow Data | Water Directory",
   description:
     "See sewage spill data for towns across England and Wales. Official Environment Agency storm overflow statistics including spill counts and discharge durations.",
-  ...(process.env.NEXT_PUBLIC_SITE_URL
-    ? {
-        alternates: {
-          canonical: `${process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")}/sewage-spills`,
-        },
-      }
-    : {}),
+  alternates: {
+    canonical: `${getSiteUrl()}/sewage-spills`,
+  },
   openGraph: {
     title: "Sewage Spills by Town — Storm Overflow Data | Water Directory",
     description:

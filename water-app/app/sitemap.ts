@@ -1,10 +1,9 @@
 import type { MetadataRoute } from "next";
+import { getSiteUrl } from "@/lib/site-url";
 import { getTownsLive } from "@/lib/towns";
 
 function baseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://waterdirectory.co.uk"
-  ).replace(/\/$/, "");
+  return getSiteUrl();
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {

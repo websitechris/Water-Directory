@@ -17,6 +17,7 @@ import {
   hardnessLabel,
   parseChemNumber,
 } from "@/lib/water-chemical-format";
+import { getSiteUrl } from "@/lib/site-url";
 
 export const revalidate = 86400;
 
@@ -50,7 +51,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: "Town not found | Water Directory" };
   }
   const { town, water } = payload;
-  const base = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+  const base = getSiteUrl();
   const title = `Tap Water Quality in ${town.name} — Nitrates, Lead, Chlorine | Water Directory`;
 
   let description: string;
@@ -64,9 +65,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    ...(base
-      ? { alternates: { canonical: `${base}/water-quality/${slug}` } }
-      : {}),
+    alternates: { canonical: `${base}/water-quality/${slug}` },
     openGraph: {
       title,
       description,

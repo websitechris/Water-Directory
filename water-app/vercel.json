@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "has": [{ "type": "host", "value": "www.waterdirectory.co.uk" }],
+      "destination": "https://www.waterdirectory.co.uk/:path+",
+      "permanent": true
+    },
+    {
+      "source": "/:path+/",
+      "has": [{ "type": "host", "value": "waterdirectory.co.uk" }],
+      "destination": "https://www.waterdirectory.co.uk/:path+",
+      "permanent": true
+    }
+  ]
+}

@@ -41,11 +41,10 @@ export async function generateMetadata({
     }
 
     const city = data.adminDistrict ?? "Unknown";
-    const year = "2024";
     const supplier = data.supplier ?? "Unknown";
 
     return {
-      title: `Tap Water Quality in ${city} ${year} | Water Directory`,
+      title: `Tap Water Quality in ${city} | Water Directory`,
       description: `See nitrate, lead, fluoride and chlorine levels for ${city}. Supplied by ${supplier}. Real DWI lab data.`,
     };
   } catch {

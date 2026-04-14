@@ -441,7 +441,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
             What&apos;s actually in your tap water?
           </h1>
           <p className="mt-3 text-center text-base text-[#1e293b]/80 sm:text-lg">
-            Real 2024 lab data for every UK postcode
+            Latest available lab data for every UK postcode
           </p>
 
           {loading && loadingUi && (

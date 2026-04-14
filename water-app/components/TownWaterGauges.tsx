@@ -46,7 +46,7 @@ const HARDNESS_MAX = 400;
 
 function formatReading(val: number | string | null | undefined): string {
   const n = parseChemNumber(val);
-  if (n === null) return "—";
+  if (n === null) return "ND";
   if (typeof val === "string" && String(val).includes("<")) return val;
   return n.toFixed(2);
 }
@@ -159,9 +159,20 @@ export function TownWaterGauges({ chemicals }: Props) {
         >
           <p className="font-semibold text-sm text-[#0f2942]">{config.name}</p>
           <p className="mt-1 text-xl font-bold tabular-nums text-[#1e293b]">
-            {formatReading(value)}{" "}
-            <span className="text-sm font-normal text-[#64748b]">{config.unit}</span>
+            {parseChemNumber(value) === null ? (
+              <span className="text-[#475569]">ND</span>
+            ) : (
+              <>
+                {formatReading(value)}{" "}
+                <span className="text-sm font-normal text-[#64748b]">{config.unit}</span>
+              </>
+            )}
           </p>
+          {parseChemNumber(value) === null ? (
+            <p className="mt-1 text-xs text-[#94a3b8]">
+              Not found in local samples · area average is within limits
+            </p>
+          ) : null}
           <GaugeBar value={value} config={config} />
         </div>
       ))}

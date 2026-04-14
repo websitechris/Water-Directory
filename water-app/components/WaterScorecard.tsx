@@ -224,7 +224,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
 
   const displaySupplier = supplier.replace(/\(.*$/, "").trim();
   const sourceText = hasLocalSamples
-    ? `Source: ${displaySupplier} official lab results 2024`
+    ? `Source: ${displaySupplier} official lab results`
     : "Regional baseline data — local lab results for your exact supply zone are updated annually by your water company";
 
   const chemicals = [
@@ -237,11 +237,67 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
   const hardnessNum = hardness != null && !isNaN(hardness) ? hardness : null;
   const hardnessIsEstimate = Boolean(hardnessEstimate && hardnessNum !== null);
 
-  const chemicalsNeedAttention = chemicals.some(({ value, config }) => {
+  const chemicalAssessments = chemicals.map(({ value, config, key }) => {
     const num = parseVal(value);
-    if (num === null) return false;
-    return num / config.limit >= config.amberStart;
+    if (num === null) return { key, name: config.name, status: "notDetected" as const };
+    const ratio = num / config.limit;
+    if (ratio > 0.85) return { key, name: config.name, status: "attention" as const };
+    if (ratio >= 0.6) return { key, name: config.name, status: "moderate" as const };
+    return { key, name: config.name, status: "fine" as const };
   });
+  const chemicalsNeedAttention = chemicalAssessments.some((c) => c.status === "attention");
+
+  const namesByStatus = {
+    attention: chemicalAssessments
+      .filter((c) => c.status === "attention")
+      .map((c) => c.name),
+    moderate: chemicalAssessments.filter((c) => c.status === "moderate").map((c) => c.name),
+    fine: chemicalAssessments.filter((c) => c.status === "fine").map((c) => c.name),
+    notDetected: chemicalAssessments
+      .filter((c) => c.status === "notDetected")
+      .map((c) => c.name.toLowerCase()),
+  };
+
+  function formatList(items: string[]): string {
+    if (items.length <= 1) return items[0] ?? "";
+    if (items.length === 2) return `${items[0]} and ${items[1]}`;
+    return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+  }
+
+  function chemicalSummaryLine(): string {
+    const clauses: string[] = [];
+    if (namesByStatus.attention.length > 0) {
+      clauses.push(
+        `${formatList(namesByStatus.attention)} ${
+          namesByStatus.attention.length === 1 ? "needs" : "need"
+        } attention.`
+      );
+    }
+    if (namesByStatus.moderate.length > 0) {
+      clauses.push(
+        `${formatList(namesByStatus.moderate)} ${
+          namesByStatus.moderate.length === 1 ? "is" : "are"
+        } near ${namesByStatus.moderate.length === 1 ? "its limit." : "their limits."}`
+      );
+    }
+    if (namesByStatus.attention.length === 0 && namesByStatus.moderate.length === 0) {
+      if (namesByStatus.fine.length > 0) {
+        clauses.push("All tested chemicals are well within safe limits.");
+      } else {
+        clauses.push("No local chemical detections were reported.");
+      }
+    } else if (namesByStatus.fine.length > 0) {
+      clauses.push("Other chemicals are within safe limits.");
+    }
+    if (namesByStatus.notDetected.length > 0) {
+      clauses.push(
+        `${formatList(namesByStatus.notDetected)} ${
+          namesByStatus.notDetected.length === 1 ? "was" : "were"
+        } not detected in local sampling.`
+      );
+    }
+    return clauses.join(" ");
+  }
 
   const hasSpills = data.sewageSpills?.some((s) => s.spills > 0) ?? false;
   const spillSites = data.sewageSpills?.filter((s) => s.spills > 0) ?? [];
@@ -256,8 +312,19 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
       >
         <p className="font-semibold text-sm text-[#0f2942]">{config.name}</p>
         <p className="mt-1 font-bold tabular-nums text-xl text-[#1e293b]">
-          {fmt(value)} <span className="text-sm font-normal text-[#64748b]">{config.unit}</span>
+          {parseVal(value) === null ? (
+            <span className="text-[#475569]">ND</span>
+          ) : (
+            <>
+              {fmt(value)} <span className="text-sm font-normal text-[#64748b]">{config.unit}</span>
+            </>
+          )}
         </p>
+        {parseVal(value) === null ? (
+          <p className="mt-1 text-xs text-[#94a3b8]">
+            Not found in local samples · area average is within limits
+          </p>
+        ) : null}
         <GaugeBar value={value} config={config} />
       </div>
     )),
@@ -321,7 +388,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
       </p>
       <p className="mt-1 text-xl font-bold text-[#0f2942]">{displaySupplier}</p>
       <p className="mt-1 text-xs text-[#64748b]">
-        Data period: 2024 | {sourceText}
+        Latest available data | {sourceText}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -346,11 +413,10 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
         }`}
       >
         <p className="text-sm">
-          {chemicalsNeedAttention ? (
-            <span className="text-[#d97706]">⚠️ Some chemicals need attention</span>
-          ) : (
-            <span className="text-[#22c55e]">✅ All chemicals within safe limits</span>
-          )}
+          <span className={chemicalsNeedAttention ? "text-[#d97706]" : "text-[#22c55e]"}>
+            {chemicalsNeedAttention ? "⚠️ " : "✅ "}
+            {chemicalSummaryLine()}
+          </span>
         </p>
         <p className="mt-0.5 text-sm">
           {hasSpills && worstSpill ? (
@@ -395,7 +461,7 @@ export function WaterScorecard({ data }: { data: WaterScorecardData }) {
               ))}
             </div>
             <p className="text-xs text-[#64748b] mt-3">
-              EA EDM data · {data.sewageSpills[0]?.year}
+              EA storm overflow data
             </p>
           </div>
         ) : (

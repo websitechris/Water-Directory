@@ -627,7 +627,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
 
           <div className="mt-10 grid gap-6 sm:grid-cols-3">
             <a
-              href="/water-quality-for-babies"
+              href="/blog/tap-water-nitrates-baby-uk"
               className="block rounded-lg border border-[#0f2942]/10 bg-white p-6 transition hover:border-[#0891b2]/30 hover:shadow-md"
             >
               <p className="font-semibold text-[#0f2942]">New baby at home?</p>
@@ -637,7 +637,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
               <p className="mt-3 text-sm font-medium text-[#0891b2]">Parents hub →</p>
             </a>
             <a
-              href="/hard-water-skin-health"
+              href="/blog/hard-water-eczema-uk"
               className="block rounded-lg border border-[#0f2942]/10 bg-white p-6 transition hover:border-[#0891b2]/30 hover:shadow-md"
             >
               <p className="font-semibold text-[#0f2942]">Dry skin or eczema?</p>
@@ -647,7 +647,7 @@ export function WaterLookup({ initialPostcode }: WaterLookupProps) {
               <p className="mt-3 text-sm font-medium text-[#0891b2]">Skin & health hub →</p>
             </a>
             <a
-              href="/water-quality-home-buying"
+              href="/blog/water-quality-home-buying"
               className="block rounded-lg border border-[#0f2942]/10 bg-white p-6 transition hover:border-[#0891b2]/30 hover:shadow-md"
             >
               <p className="font-semibold text-[#0f2942]">Just bought a house?</p>

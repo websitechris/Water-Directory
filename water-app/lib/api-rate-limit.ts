@@ -35,7 +35,7 @@ type RateOutcome =
 
 function checkRateLimit(ip: string): RateOutcome {
   const now = Date.now();
-  let arr = pruneToHourWindow(ip, now);
+  const arr = pruneToHourWindow(ip, now);
 
   const inMinute = arr.filter((t) => t > now - MS_MINUTE);
   if (inMinute.length >= MAX_PER_MINUTE) {

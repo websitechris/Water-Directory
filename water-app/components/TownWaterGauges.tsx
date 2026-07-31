@@ -9,6 +9,8 @@ type GaugeConfig = {
   limit: number;
   amberStart: number;
   redStart: number;
+  /** Overrides the default "PCV / limit: X" caption where no PCV exists. */
+  limitLabel?: string;
 };
 
 const GAUGE_CONFIG: Record<string, GaugeConfig> = {
@@ -22,9 +24,13 @@ const GAUGE_CONFIG: Record<string, GaugeConfig> = {
   chlorine: {
     name: "Chlorine",
     unit: "mg/L",
-    limit: 0.5,
+    // There is NO UK prescribed concentration value for free chlorine — it is
+    // controlled for taste and odour, and a residual is required through the
+    // network. Scaled against the WHO guideline value of 5 mg/L instead.
+    limit: 5,
     amberStart: 0.6,
-    redStart: 1,
+    redStart: 0.8,
+    limitLabel: "No UK limit · WHO guideline 5 mg/L",
   },
   fluoride: {
     name: "Fluoride",
@@ -88,7 +94,7 @@ function GaugeBar({
         )}
       </div>
       <p className="mt-1 text-xs text-[#64748b]">
-        PCV / limit: {config.limit} {config.unit}
+        {config.limitLabel ?? `PCV / limit: ${config.limit} ${config.unit}`}
       </p>
     </div>
   );

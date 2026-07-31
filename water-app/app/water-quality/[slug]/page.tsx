@@ -18,6 +18,7 @@ import {
   parseChemNumber,
 } from "@/lib/water-chemical-format";
 import { getSiteUrl } from "@/lib/site-url";
+import { getTestingLocalityForTown } from "@/lib/water-testing-localities";
 
 export const revalidate = 86400;
 
@@ -38,10 +39,46 @@ function cleanSupplierName(s: string): string {
   return s.replace(/\(.*$/, "").trim();
 }
 
-function metaChemicalLine(c: TownWaterChemicals): string {
-  const n = formatChemDisplay(c.nitrates);
-  const l = formatChemDisplay(c.lead);
-  return `Nitrates: ${n} mg/L, Lead: ${l} µg/L`;
+type ResolvedHardness = {
+  category: "soft" | "moderate" | "hard" | "veryhard";
+  mgPerLitre: number;
+  label: string;
+  isEstimate: boolean;
+};
+
+/**
+ * Single source of truth for hardness: lab CaCO₃ where we have it, county
+ * geology as fallback. Hardness is the highest-volume search intent for these
+ * pages ("is X a hard water area", "X water hardness"), so both the metadata
+ * and the on-page answer line read from here.
+ */
+function resolveHardness(
+  hardnessNum: number | null,
+  county: string
+): ResolvedHardness | null {
+  if (hardnessNum != null) {
+    const cat = getHardnessCategory(hardnessNum);
+    return {
+      category: cat,
+      mgPerLitre: hardnessNum,
+      label: hardnessLabel(cat),
+      isEstimate: false,
+    };
+  }
+  const est = getEstimatedHardness(county);
+  if (!est) return null;
+  return {
+    category: est.category,
+    mgPerLitre: est.mgPerLitre,
+    label: hardnessLabel(est.category),
+    isEstimate: true,
+  };
+}
+
+/** "very hard (~350 mg/L CaCO₃)" — reused in meta description and FAQ answers. */
+function hardnessPhrase(h: ResolvedHardness): string {
+  const approx = h.isEstimate ? "~" : "";
+  return `${h.label.toLowerCase()} (${approx}${Math.round(h.mgPerLitre)} mg/L CaCO₃)`;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -52,20 +89,38 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
   const { town, water } = payload;
   const base = getSiteUrl();
-  const title = `Tap Water Quality in ${town.name} — Nitrates, Lead, Chlorine | Water Directory`;
+  const canonical = `${base}/water-quality/${slug}`;
 
-  let description: string;
   if (!water.ok) {
-    description = `Tap water quality for ${town.name}. ${water.message}`;
-  } else {
-    const sup = cleanSupplierName(water.supplier);
-    description = `${town.name} tap water is supplied by ${sup}. ${metaChemicalLine(water.chemicals)}. See full lab results from official DWI data.`;
+    const title = `${town.name} Tap Water Quality — Official DWI Lab Data`;
+    const description = `Tap water quality for ${town.name}. ${water.message}`;
+    return {
+      title,
+      description,
+      alternates: { canonical },
+      openGraph: { title, description, type: "article" },
+    };
   }
+
+  const sup = cleanSupplierName(water.supplier);
+  const hard = resolveHardness(water.chemicals.hardness, town.county);
+  const nitrates = formatChemDisplay(water.chemicals.nitrates);
+
+  // Lead with hardness + safety: these are the two query clusters that carry
+  // the traffic. "| Water Directory" is dropped — Google appends the site name
+  // itself and the characters are better spent on the answer.
+  const title = hard
+    ? `${town.name} Tap Water: ${hard.label} — Is It Safe to Drink?`
+    : `${town.name} Tap Water: Is It Safe to Drink? Lab Results`;
+
+  const description = hard
+    ? `${town.name} tap water is ${hardnessPhrase(hard)}, supplied by ${sup}. Nitrates ${nitrates} mg/L. Official DWI lab data, checkable by postcode.`
+    : `${town.name} tap water is supplied by ${sup}. Nitrates ${nitrates} mg/L. Official DWI lab results, checkable by postcode.`;
 
   return {
     title,
     description,
-    alternates: { canonical: `${base}/water-quality/${slug}` },
+    alternates: { canonical },
     openGraph: {
       title,
       description,
@@ -100,11 +155,15 @@ function healthContext(c: TownWaterChemicals): {
   const nitrateWarn = n !== null && n > 30;
   const leadWarn = l !== null && l > 5;
 
+  // Chlorine is deliberately excluded from the legality test. The Water Supply
+  // (Water Quality) Regulations 2016 set no PCV for free chlorine — it is
+  // controlled for taste and odour, and residual chlorine is *required* through
+  // the network. Treating 0.5 mg/L as a limit wrongly suppressed the "within
+  // safe limits" panel for any zone dosing normally (e.g. Newcastle at 0.63).
   const legal =
     (n === null || n <= 50) &&
     (l === null || l <= 10) &&
-    (f === null || f <= 1.5) &&
-    (cl === null || cl <= 0.5);
+    (f === null || f <= 1.5);
 
   const hasChemReadings = n !== null || l !== null || f !== null || cl !== null;
 
@@ -133,6 +192,25 @@ function DropletIcon() {
   );
 }
 
+function FlaskIcon() {
+  return (
+    <svg
+      className="h-8 w-8 shrink-0 text-[#0891b2]"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M14.25 3.104v5.714a2.25 2.25 0 0 0 .659 1.591L19 14.5M8.25 3h7.5M5 14.5h14a2 2 0 0 1 1.75 2.97l-.5.9A3 3 0 0 1 17.63 21H6.37a3 3 0 0 1-2.62-1.63l-.5-.9A2 2 0 0 1 5 14.5Z"
+      />
+    </svg>
+  );
+}
+
 function MapPinIcon() {
   return (
     <svg
@@ -151,6 +229,99 @@ function MapPinIcon() {
       />
     </svg>
   );
+}
+
+/**
+ * UK prescribed concentration values (PCVs), Water Supply (Water Quality)
+ * Regulations 2016. Chlorine deliberately has no PCV — it is controlled for
+ * taste and odour rather than a statutory ceiling, so it is described rather
+ * than scored.
+ */
+const READING_NOTES = [
+  {
+    key: "nitrates" as const,
+    name: "Nitrates",
+    unit: "mg/L",
+    limit: "50 mg/L",
+    what: "Nitrates come mainly from agricultural fertiliser and sewage reaching groundwater. Healthy adults process them without difficulty; the limit exists principally to protect bottle-fed infants under six months.",
+  },
+  {
+    key: "lead" as const,
+    name: "Lead",
+    unit: "µg/L",
+    limit: "10 µg/L",
+    what: "Water leaves the treatment works lead-free. Any lead is picked up from the pipework between the main and your tap, so the reading depends heavily on your own property — pre-1970 homes are the ones worth checking.",
+  },
+  {
+    key: "fluoride" as const,
+    name: "Fluoride",
+    unit: "mg/L",
+    limit: "1.5 mg/L",
+    what: "Occurs naturally in some groundwater and is deliberately added in a minority of UK supply areas. Around 10% of England receives a fluoridated supply.",
+  },
+  {
+    key: "chlorine" as const,
+    name: "Chlorine",
+    unit: "mg/L",
+    limit: "no statutory limit",
+    what: "Added as a disinfectant and required to remain present through the network to keep water safe in transit. Typically 0.2–0.5 mg/L at the tap. A noticeable taste is usually harmless and fades if water stands in a covered jug.",
+  },
+];
+
+type FaqEntry = { q: string; a: string };
+
+/**
+ * FAQPage JSON-LD generated from live data. Targets the question queries these
+ * pages already rank ~7 for but win no clicks on: "is X tap water safe to
+ * drink", "is X hard or soft water", "who supplies X water".
+ */
+function buildTownFaq(args: {
+  townName: string;
+  supplier: string;
+  hardness: ResolvedHardness | null;
+  chemicals: TownWaterChemicals;
+  allSafe: boolean;
+  nitrateWarn: boolean;
+}): FaqEntry[] {
+  const { townName, supplier, hardness, chemicals, allSafe, nitrateWarn } = args;
+  const faq: FaqEntry[] = [];
+
+  const nitrates = formatChemDisplay(chemicals.nitrates);
+  const lead = formatChemDisplay(chemicals.lead);
+
+  faq.push({
+    q: `Is ${townName} tap water safe to drink?`,
+    a: allSafe
+      ? `Yes. ${townName} tap water is supplied by ${supplier} and every parameter we hold — nitrates ${nitrates} mg/L, lead ${lead} µg/L — falls within UK drinking water standards set by the Drinking Water Inspectorate. Readings vary by supply zone, so check your exact postcode for local results.`
+      : `${townName} tap water is supplied by ${supplier} and is treated to UK drinking water standards. Our latest DWI figures show nitrates at ${nitrates} mg/L and lead at ${lead} µg/L${nitrateWarn ? ", with nitrates elevated enough to be worth noting if you are preparing infant formula" : ""}. Readings vary by supply zone, so check your exact postcode.`,
+  });
+
+  if (hardness) {
+    const softOrHard =
+      hardness.category === "soft" || hardness.category === "moderate"
+        ? "soft"
+        : "hard";
+    faq.push({
+      q: `Is ${townName} hard or soft water?`,
+      a: `${townName} has ${softOrHard} water. It measures ${hardnessPhrase(hardness)}, which is classed as ${hardness.label.toLowerCase()} on the UK scale.${hardness.isEstimate ? " This is estimated from local geology where lab CaCO₃ data for the supply zone is not yet published." : ""}`,
+    });
+
+    faq.push({
+      q: `What is the water hardness in ${townName}?`,
+      a: `Water hardness in ${townName} is ${hardnessPhrase(hardness)} — ${hardness.label.toLowerCase()}.${
+        hardness.mgPerLitre > 200
+          ? " Above roughly 200 mg/L you can expect limescale in kettles and appliances, and some people find hard water aggravates dry skin."
+          : " At this level limescale is not usually a problem."
+      }`,
+    });
+  }
+
+  faq.push({
+    q: `Who supplies the tap water in ${townName}?`,
+    a: `Tap water in ${townName} is supplied by ${supplier}. They are responsible for treatment, distribution and the laboratory testing reported to the Drinking Water Inspectorate.`,
+  });
+
+  return faq;
 }
 
 export default async function TownWaterQualityPage({ params }: PageProps) {
@@ -212,8 +383,33 @@ export default async function TownWaterQualityPage({ params }: PageProps) {
   const hardnessGeoEstimate =
     hardnessNum == null ? getEstimatedHardness(town.county) : null;
 
+  const resolvedHardness = resolveHardness(hardnessNum, town.county);
+  const testingLocality = getTestingLocalityForTown(slug);
+  const faq = buildTownFaq({
+    townName: town.name,
+    supplier: displaySupplier,
+    hardness: resolvedHardness,
+    chemicals,
+    allSafe: allSafeTeal,
+    nitrateWarn,
+  });
+
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faq.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+
   return (
     <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <nav className="mb-6 text-sm text-[#64748b]" aria-label="Breadcrumb">
         <Link href="/" className="text-[#0891b2] hover:underline">
           Home
@@ -230,6 +426,23 @@ export default async function TownWaterQualityPage({ params }: PageProps) {
         <h1 className="text-3xl font-bold tracking-tight text-[#0f2942] md:text-4xl">
           Tap water quality in {town.name}
         </h1>
+
+        {/* Direct-answer line. Plain sentence, matches the query wording, and
+            gives Google something liftable for the featured snippet. */}
+        {resolvedHardness && (
+          <p className="mt-4 text-lg font-medium leading-relaxed text-[#1e293b] md:text-xl">
+            {town.name} has{" "}
+            <strong className="font-semibold">
+              {resolvedHardness.label.toLowerCase()} water
+            </strong>{" "}
+            ({resolvedHardness.isEstimate ? "~" : ""}
+            {Math.round(resolvedHardness.mgPerLitre)} mg/L CaCO₃)
+            {allSafeTeal
+              ? ", and all tested parameters are within UK drinking water limits."
+              : ", supplied and treated to UK drinking water standards."}
+          </p>
+        )}
+
         <p className="mt-3 text-sm text-[#64748b] md:text-base">
           Supplied by <span className="font-semibold text-[#0f2942]">{displaySupplier}</span>
           {zoneName ? (
@@ -380,8 +593,119 @@ export default async function TownWaterQualityPage({ params }: PageProps) {
         <TownWaterGauges chemicals={chemicals} />
       </section>
 
+      {/* What the readings mean */}
+      <section className="mt-12">
+        <h2 className="text-xl font-semibold text-[#0f2942]">
+          What these readings mean
+        </h2>
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[#475569]">
+          UK drinking water is regulated under the Water Supply (Water Quality)
+          Regulations 2016, which set a prescribed concentration value (PCV) for
+          each substance. {displaySupplier} must sample against these and report
+          the results to the Drinking Water Inspectorate.
+        </p>
+        <div className="mt-6 divide-y divide-[#e2e8f0] overflow-hidden rounded-2xl border border-[#e2e8f0] bg-white shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)]">
+          {READING_NOTES.map((r) => (
+            <div key={r.key} className="p-5 md:p-6">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <h3 className="text-base font-semibold text-[#0f2942]">
+                  {r.name} in {town.name}
+                </h3>
+                <p className="text-sm tabular-nums text-[#475569]">
+                  <span className="font-semibold text-[#0f2942]">
+                    {formatChemDisplay(chemicals[r.key])} {r.unit}
+                  </span>
+                  <span className="mx-2 text-[#cbd5e1]">·</span>
+                  UK limit {r.limit}
+                </p>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-[#475569]">{r.what}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Hard water — practical, only where it is actually relevant */}
+      {resolvedHardness && resolvedHardness.mgPerLitre > 200 && (
+        <section className="mt-10 rounded-2xl border border-[#e2e8f0] bg-white p-6 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] md:p-8">
+          <h2 className="text-xl font-semibold text-[#0f2942]">
+            Living with hard water in {town.name}
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-[#475569]">
+            At {resolvedHardness.isEstimate ? "around " : ""}
+            {Math.round(resolvedHardness.mgPerLitre)} mg/L CaCO₃, {town.name} sits
+            firmly in the hard water band. Hardness is dissolved calcium and
+            magnesium picked up as water passes through chalk and limestone. It is
+            not a health risk — the minerals are the same ones found in food — but
+            it has practical consequences.
+          </p>
+          <ul className="mt-4 space-y-2 text-sm leading-relaxed text-[#475569]">
+            <li>
+              <strong className="font-semibold text-[#0f2942]">Limescale.</strong>{" "}
+              Kettles, showerheads and heating elements scale up faster. Descaling
+              every few months keeps appliances efficient.
+            </li>
+            <li>
+              <strong className="font-semibold text-[#0f2942]">Skin.</strong> Some
+              people with eczema find hard water aggravates symptoms, though the
+              evidence on softeners as a treatment is mixed rather than settled.
+            </li>
+            <li>
+              <strong className="font-semibold text-[#0f2942]">
+                Soap and detergent.
+              </strong>{" "}
+              Hard water needs more of both to lather, which is why dishwasher salt
+              exists.
+            </li>
+          </ul>
+          <Link
+            href="/blog/hard-water-eczema-uk"
+            className="mt-4 inline-block text-sm font-semibold text-[#0891b2] hover:underline"
+          >
+            Hard water and skin — what the research says →
+          </Link>
+        </section>
+      )}
+
+      {/* FAQ — must stay visible on the page: Google only honours FAQPage
+          schema when the same Q&A text is rendered for users. */}
+      <section className="mt-12" aria-label="Frequently asked questions">
+        <h2 className="mb-4 text-lg font-semibold text-[#0f2942]">
+          Common questions about {town.name} tap water
+        </h2>
+        <div className="divide-y divide-[#e2e8f0] overflow-hidden rounded-2xl border border-[#e2e8f0] bg-white shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)]">
+          {faq.map((f) => (
+            <div key={f.q} className="p-5 md:p-6">
+              <h3 className="text-base font-semibold text-[#0f2942]">{f.q}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-[#475569]">{f.a}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Cross-links */}
-      <section className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <section
+        className={`mt-12 grid grid-cols-1 gap-4 ${
+          testingLocality ? "md:grid-cols-3" : "md:grid-cols-2"
+        }`}
+      >
+        {testingLocality && (
+          <Link
+            href={`/water-testing/${testingLocality.slug}`}
+            className="flex gap-4 rounded-2xl border border-[#e2e8f0] bg-white p-6 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-shadow hover:shadow-md"
+          >
+            <FlaskIcon />
+            <div>
+              <p className="font-semibold text-[#0f2942]">
+                Water testing in {testingLocality.name}
+              </p>
+              <p className="mt-1 text-sm text-[#64748b]">
+                What {displaySupplier} tests free, and when a paid lab test is
+                worth it.
+              </p>
+            </div>
+          </Link>
+        )}
         <Link
           href={`/sewage-spills/${slug}`}
           className="flex gap-4 rounded-2xl border border-[#e2e8f0] bg-white p-6 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)] transition-shadow hover:shadow-md"

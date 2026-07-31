@@ -9,6 +9,7 @@ const homeClass = "font-semibold text-[#0f2942] hover:text-[#0891b2]";
 const navLinks = [
   { href: "/water-quality", label: "Water Quality" },
   { href: "/sewage-spills", label: "Sewage Spills" },
+  { href: "/water-testing", label: "Water Testing" },
   { href: "/suppliers", label: "Water Suppliers" },
   { href: "/about", label: "About" },
 ] as const;

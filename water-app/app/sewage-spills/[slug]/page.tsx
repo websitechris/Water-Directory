@@ -34,10 +34,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!payload) {
     return { title: "Town not found | Water Directory" };
   }
-  const { town, totalSpills, totalHours, primaryYear } = payload;
+  const { town, totalSpills, totalHours, siteCount, primaryYear } = payload;
   const base = getSiteUrl();
-  const title = `Sewage Spills in ${town.name} — ${primaryYear} Storm Overflow Data | Water Directory`;
-  const description = `${town.name} had ${totalSpills.toLocaleString()} sewage spills totalling ${totalHours.toLocaleString()} hours in ${primaryYear}. See the worst overflow sites near ${town.name} from official Environment Agency data.`;
+
+  // Lead with the number. "| Water Directory" dropped — Google appends the site
+  // name itself and the old title ran to ~73 chars and truncated.
+  const title =
+    totalSpills > 0
+      ? `${town.name} Sewage Spills: ${totalSpills.toLocaleString()} in ${primaryYear}`
+      : `Sewage Spills in ${town.name} — Storm Overflow Data`;
+
+  const description =
+    totalSpills > 0
+      ? `Storm overflows near ${town.name} discharged ${totalSpills.toLocaleString()} times in ${primaryYear}, totalling ${totalHours.toLocaleString()} hours across ${siteCount} monitored sites. Official Environment Agency data.`
+      : `Storm overflow discharge data for ${town.name} from official Environment Agency monitoring. See which sites report near you.`;
 
   return {
     title,
@@ -49,6 +59,24 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       type: "article",
     },
   };
+}
+
+/** Dominant operator name only, for prose and FAQ answers. */
+function dominantOperator(sites: SpillSite[]): string {
+  const map = new Map<string, number>();
+  for (const s of sites) {
+    const c = (s.company || "").trim();
+    if (c) map.set(c, (map.get(c) ?? 0) + s.spills);
+  }
+  let best = "your water company";
+  let max = -1;
+  for (const [c, v] of map) {
+    if (v > max) {
+      max = v;
+      best = c;
+    }
+  }
+  return best;
 }
 
 /** Dominant operator by summed spill count (for header subtitle). */
@@ -137,18 +165,91 @@ function ClockIcon() {
   );
 }
 
+type FaqEntry = { q: string; a: string };
+
+/**
+ * FAQ generated from live EA figures. Targets the intent behind these pages —
+ * "is it safe to swim", "why do they do it", "who do I report it to" — none of
+ * which the numbers alone answer.
+ */
+function buildSewageFaq(args: {
+  townName: string;
+  totalSpills: number;
+  totalHours: number;
+  siteCount: number;
+  primaryYear: string;
+  operator: string;
+}): FaqEntry[] {
+  const { townName, totalSpills, totalHours, siteCount, primaryYear, operator } =
+    args;
+  const faq: FaqEntry[] = [];
+
+  if (totalSpills > 0) {
+    faq.push({
+      q: `How many sewage spills were there in ${townName}?`,
+      a: `Monitored storm overflows within 5 km of ${townName} recorded ${totalSpills.toLocaleString()} discharge events in ${primaryYear}, totalling ${totalHours.toLocaleString()} hours across ${siteCount} sites. These figures come from Environment Agency Event Duration Monitoring, which water companies are required to fit to storm overflows and report annually.`,
+    });
+  }
+
+  faq.push({
+    q: `Why do water companies release sewage near ${townName}?`,
+    a: `Much of the UK uses a combined sewer system, where rainwater and wastewater share the same pipes. During heavy rain the volume can exceed what the network and treatment works can carry. Storm overflows act as a designed relief valve, releasing diluted sewage into rivers or the sea rather than backing it up into homes and streets. The problem is that they are now used far more often than the system was intended to allow.`,
+  });
+
+  faq.push({
+    q: `Is it legal to discharge sewage into rivers and the sea?`,
+    a: `Storm overflows operate under environmental permits, so discharging within those permit conditions is lawful. Discharging outside them — for example in dry weather, or beyond permitted duration — is not, and is enforceable by the Environment Agency. The distinction matters: a high spill count is not by itself evidence of illegality, but it is evidence of a network under strain.`,
+  });
+
+  faq.push({
+    q: `Is it safe to swim near ${townName}?`,
+    a: `Storm overflow data tells you where and how often discharges happen, not the water quality on a given day. If you swim, check the Environment Agency's designated bathing water classifications for your spot, and short-term pollution alerts before entering. Risk is highest during and for around 48 hours after heavy rainfall. Surfers Against Sewage runs a free real-time alert service for many UK bathing sites.`,
+  });
+
+  faq.push({
+    q: `Who do I report a sewage spill or pollution to?`,
+    a: `Report pollution incidents in England to the Environment Agency's 24-hour incident hotline on 0800 80 70 60. In Wales, contact Natural Resources Wales on 0300 065 3000. You can also report the issue to ${operator} directly, and it is worth doing both so the incident is logged independently of the operator.`,
+  });
+
+  return faq;
+}
+
 export default async function SewageSpillsTownPage({ params }: PageProps) {
   const { slug } = await params;
   const payload = await getTownSewage(slug);
   if (!payload) notFound();
 
-  const { town, sites, totalSpills, totalHours, siteCount } = payload;
+  const { town, sites, totalSpills, totalHours, siteCount, primaryYear } = payload;
   const subtitle = primaryWaterCompanyLine(sites);
   const equivalentDays =
     totalHours > 0 ? Math.round((totalHours / 24) * 10) / 10 : 0;
+  const operator = dominantOperator(sites);
+
+  const faq = buildSewageFaq({
+    townName: town.name,
+    totalSpills,
+    totalHours,
+    siteCount,
+    primaryYear,
+    operator,
+  });
+
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faq.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <nav className="mb-6 text-sm text-[#64748b]" aria-label="Breadcrumb">
         <Link href="/" className="text-[#0891b2] hover:underline">
           Home
@@ -165,6 +266,22 @@ export default async function SewageSpillsTownPage({ params }: PageProps) {
         <h1 className="text-3xl font-bold tracking-tight text-[#0f2942] md:text-4xl">
           Sewage spills in {town.name}
         </h1>
+
+        {/* Direct-answer line — plain sentence, matches the query, liftable. */}
+        {totalSpills > 0 && (
+          <p className="mt-4 max-w-3xl text-lg font-medium leading-relaxed text-[#1e293b] md:text-xl">
+            Storm overflows near {town.name} discharged{" "}
+            <strong className="font-semibold">
+              {totalSpills.toLocaleString()} times
+            </strong>{" "}
+            in {primaryYear}, for a combined{" "}
+            <strong className="font-semibold">
+              {totalHours.toLocaleString()} hours
+            </strong>{" "}
+            across {siteCount} monitored {siteCount === 1 ? "site" : "sites"}.
+          </p>
+        )}
+
         <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[#64748b] md:text-base">
           {subtitle}
         </p>
@@ -267,6 +384,82 @@ export default async function SewageSpillsTownPage({ params }: PageProps) {
         ) : (
           <SewageSitesTable sites={sites} />
         )}
+      </section>
+
+      {/* What the numbers actually mean */}
+      <section className="mt-12">
+        <h2 className="text-xl font-semibold text-[#0f2942]">
+          What this data does and does not tell you
+        </h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {[
+            {
+              t: "It counts events, not volume",
+              d: "Event Duration Monitoring records when an overflow ran and for how long. It does not measure how much was discharged, or how diluted it was. A long spill in heavy rain may be far more diluted than a short one in light rain.",
+            },
+            {
+              t: "Coverage has improved sharply",
+              d: "Monitors were fitted across almost all storm overflows in England by the end of 2023. Rising spill counts in recent years partly reflect better monitoring, not only worse performance — which is why year-on-year comparisons need care.",
+            },
+            {
+              t: "Permitted is not the same as harmless",
+              d: "Storm overflows are allowed under environmental permits. Operating within a permit makes a discharge lawful; it does not mean it has no effect on the river or coastline receiving it.",
+            },
+            {
+              t: "This is a 5 km radius, not a boundary",
+              d: `Sites shown are those within ${RADIUS_M / 1000} km of the centre of ${town.name}. Some may discharge into different watercourses, and overflows just outside the radius are not counted.`,
+            },
+          ].map(({ t, d }) => (
+            <div
+              key={t}
+              className="rounded-2xl border border-[#e2e8f0] bg-white p-5 shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)]"
+            >
+              <h3 className="font-semibold text-[#0f2942]">{t}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-[#475569]">{d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Reporting — practical and actionable */}
+      <section className="mt-10 rounded-2xl border border-[#0891b2]/30 bg-[#0891b2]/10 p-6">
+        <h2 className="text-lg font-semibold text-[#0f2942]">
+          Seen a pollution incident near {town.name}?
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-[#334155]">
+          Report it to the Environment Agency 24-hour incident hotline on{" "}
+          <a
+            href="tel:08008070600"
+            className="font-semibold text-[#0891b2] hover:underline"
+          >
+            0800 80 70 60
+          </a>{" "}
+          (England), or Natural Resources Wales on{" "}
+          <a
+            href="tel:03000653000"
+            className="font-semibold text-[#0891b2] hover:underline"
+          >
+            0300 065 3000
+          </a>
+          . Report it to {operator} as well — logging it in both places means the
+          incident exists independently of the operator&apos;s own records. Note the
+          time, location and what you saw, and photograph it if you safely can.
+        </p>
+      </section>
+
+      {/* FAQ — visible text mirrors the JSON-LD above */}
+      <section className="mt-12" aria-label="Frequently asked questions">
+        <h2 className="mb-4 text-xl font-semibold text-[#0f2942]">
+          Sewage spills in {town.name} — common questions
+        </h2>
+        <div className="divide-y divide-[#e2e8f0] overflow-hidden rounded-2xl border border-[#e2e8f0] bg-white shadow-[0_4px_6px_-1px_rgba(15,41,66,0.08)]">
+          {faq.map((f) => (
+            <div key={f.q} className="p-5 md:p-6">
+              <h3 className="text-base font-semibold text-[#0f2942]">{f.q}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-[#475569]">{f.a}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Cross-links */}
